@@ -1,0 +1,293 @@
+-- The liquidity theorems of AmmLean/Liquidity.lean, stated on the
+-- constructor addLiquidity and on redeemX and redeemY of src/Basic.tot.
+-- The statements name the projections of addLiquidity, as Lean names
+-- (addLiquidity p dx hdx).reserveY. addLiquidity is a reducible def whose
+-- body is one pool constructor application, so delta of the constructor
+-- and iota of the projection match unfold the projections in conversion.
+-- tot has no iff, so the cross-multiplied identity that Lean reads off
+-- lp_share_proportional with div_eq_div_iff is a def of its own,
+-- lpShareCross, and lpShareProportional and addRemoveRoundtripX both
+-- cite it.
+-- Every theorem is a plain def over the eleven parameters.
+-- The check lines stand at the end of the file, one for each def.
+
+def addLiquidityPreservesRatio :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (p : Pool F fzero flt) -> (dx : F) -> (hdx : flt fzero dx) ->
+  Eq F
+    (fdiv
+      (poolReserveY F fzero flt
+        (addLiquidity F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx))
+      (poolReserveX F fzero flt
+        (addLiquidity F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx)))
+    (fdiv (poolReserveY F fzero flt p) (poolReserveX F fzero flt p)) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      divEqDivOfMulEq F fadd fmul fsub fdiv fneg finv fzero fone flt A
+        (fadd (poolReserveY F fzero flt p)
+          (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p)))
+        (fadd (poolReserveX F fzero flt p) dx)
+        (poolReserveY F fzero flt p)
+        (poolReserveX F fzero flt p)
+        (reserveXAddNeZero F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx)
+        (poolReserveXNeZero F fadd fmul fsub fdiv fneg finv fzero fone flt A p)
+        (trans0 F
+          (fmul
+            (fadd (poolReserveY F fzero flt p)
+              (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p)))
+            (poolReserveX F fzero flt p))
+          (fadd (fmul (poolReserveY F fzero flt p) (poolReserveX F fzero flt p))
+            (fmul dx (poolReserveY F fzero flt p)))
+          (fmul (poolReserveY F fzero flt p) (fadd (poolReserveX F fzero flt p) dx))
+          (subst0 F
+            (fmul (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))
+              (poolReserveX F fzero flt p))
+            (fmul dx (poolReserveY F fzero flt p))
+            (fun z =>
+              Eq F
+                (fmul
+                  (fadd (poolReserveY F fzero flt p)
+                    (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p)))
+                  (poolReserveX F fzero flt p))
+                (fadd (fmul (poolReserveY F fzero flt p) (poolReserveX F fzero flt p)) z))
+            (divMulCancel F fadd fmul fsub fdiv fneg finv fzero fone flt A
+              (fmul dx (poolReserveY F fzero flt p))
+              (poolReserveX F fzero flt p)
+              (poolReserveXNeZero F fadd fmul fsub fdiv fneg finv fzero fone flt A p))
+            (deriveAddMul F fadd fmul fsub fdiv fneg finv fzero fone flt A
+              (poolReserveY F fzero flt p)
+              (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))
+              (poolReserveX F fzero flt p)))
+          (sym0 F
+            (fmul (poolReserveY F fzero flt p) (fadd (poolReserveX F fzero flt p) dx))
+            (fadd (fmul (poolReserveY F fzero flt p) (poolReserveX F fzero flt p))
+              (fmul dx (poolReserveY F fzero flt p)))
+            (subst0 F
+              (fmul (poolReserveY F fzero flt p) dx)
+              (fmul dx (poolReserveY F fzero flt p))
+              (fun z =>
+                Eq F
+                  (fmul (poolReserveY F fzero flt p) (fadd (poolReserveX F fzero flt p) dx))
+                  (fadd (fmul (poolReserveY F fzero flt p) (poolReserveX F fzero flt p)) z))
+              (deriveMulComm F fadd fmul fsub fdiv fneg finv fzero fone flt A
+                (poolReserveY F fzero flt p) dx)
+              (mulAdd (poolReserveY F fzero flt p) (poolReserveX F fzero flt p) dx))))
+    end
+
+check addLiquidityPreservesRatio
+
+def addLiquidityPreservesPrice :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (p : Pool F fzero flt) -> (dx : F) -> (hdx : flt fzero dx) ->
+  Eq F
+    (spotPrice F fadd fmul fsub fdiv fneg finv fzero fone flt
+      (addLiquidity F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx))
+    (spotPrice F fadd fmul fsub fdiv fneg finv fzero fone flt p) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx =>
+    addLiquidityPreservesRatio F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx
+
+check addLiquidityPreservesPrice
+
+def lpShareCross :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (p : Pool F fzero flt) -> (dx : F) -> (hdx : flt fzero dx) ->
+  Eq F
+    (fmul (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (fadd (poolReserveX F fzero flt p) dx))
+    (fmul dx (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)))) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      trans0 F
+        (fmul (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (fadd (poolReserveX F fzero flt p) dx))
+        (fadd (fmul dx (poolTotalLP F fzero flt p)) (fmul dx (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))))
+        (fmul dx (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))))
+        (subst0 F
+          (fmul (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) dx)
+          (fmul dx (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)))
+          (fun z => Eq F (fmul (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (fadd (poolReserveX F fzero flt p) dx)) (fadd (fmul dx (poolTotalLP F fzero flt p)) z))
+          (deriveMulComm F fadd fmul fsub fdiv fneg finv fzero fone flt A (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) dx)
+          (subst0 F
+            (fmul (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (poolReserveX F fzero flt p))
+            (fmul dx (poolTotalLP F fzero flt p))
+            (fun z => Eq F (fmul (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (fadd (poolReserveX F fzero flt p) dx)) (fadd z (fmul (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) dx)))
+            (divMulCancel F fadd fmul fsub fdiv fneg finv fzero fone flt A (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)
+              (poolReserveXNeZero F fadd fmul fsub fdiv fneg finv fzero fone flt A p))
+            (mulAdd (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (poolReserveX F fzero flt p) dx)))
+        (sym0 F
+          (fmul dx (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))))
+          (fadd (fmul dx (poolTotalLP F fzero flt p)) (fmul dx (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))))
+          (mulAdd dx (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))))
+    end
+
+check lpShareCross
+
+def lpShareProportional :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (p : Pool F fzero flt) -> (dx : F) -> (hdx : flt fzero dx) ->
+  Eq F
+    (fdiv (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (poolTotalLP F fzero flt (addLiquidity F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx)))
+    (fdiv dx (poolReserveX F fzero flt (addLiquidity F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx))) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx =>
+    divEqDivOfMulEq F fadd fmul fsub fdiv fneg finv fzero fone flt A
+      (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))
+      (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)))
+      dx
+      (fadd (poolReserveX F fzero flt p) dx)
+      (deriveNeOfGt F fadd fmul fsub fdiv fneg finv fzero fone flt A (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)))
+        (addLiquidityHlp F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx))
+      (reserveXAddNeZero F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx)
+      (lpShareCross F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx)
+
+check lpShareProportional
+
+def redeemProportionalX :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (p : Pool F fzero flt) -> (lp : F) ->
+  Eq F
+    (fdiv (redeemX F fadd fmul fsub fdiv fneg finv fzero fone flt p lp) (poolReserveX F fzero flt p))
+    (fdiv lp (poolTotalLP F fzero flt p)) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A p lp =>
+    trans0 F
+      (fdiv (fdiv (fmul lp (poolReserveX F fzero flt p)) (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))
+      (fdiv (fmul lp (poolReserveX F fzero flt p)) (fmul (poolTotalLP F fzero flt p) (poolReserveX F fzero flt p)))
+      (fdiv lp (poolTotalLP F fzero flt p))
+      (divDiv F fadd fmul fsub fdiv fneg finv fzero fone flt A
+        (fmul lp (poolReserveX F fzero flt p)) (poolTotalLP F fzero flt p) (poolReserveX F fzero flt p)
+        (poolTotalLPNeZero F fadd fmul fsub fdiv fneg finv fzero fone flt A p)
+        (poolReserveXNeZero F fadd fmul fsub fdiv fneg finv fzero fone flt A p))
+      (mulDivMulRight F fadd fmul fsub fdiv fneg finv fzero fone flt A
+        lp (poolTotalLP F fzero flt p) (poolReserveX F fzero flt p)
+        (poolTotalLPNeZero F fadd fmul fsub fdiv fneg finv fzero fone flt A p)
+        (poolReserveXNeZero F fadd fmul fsub fdiv fneg finv fzero fone flt A p))
+
+check redeemProportionalX
+
+def redeemProportionalY :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (p : Pool F fzero flt) -> (lp : F) ->
+  Eq F
+    (fdiv (redeemY F fadd fmul fsub fdiv fneg finv fzero fone flt p lp) (poolReserveY F fzero flt p))
+    (fdiv lp (poolTotalLP F fzero flt p)) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A p lp =>
+    trans0 F
+      (fdiv (fdiv (fmul lp (poolReserveY F fzero flt p)) (poolTotalLP F fzero flt p)) (poolReserveY F fzero flt p))
+      (fdiv (fmul lp (poolReserveY F fzero flt p)) (fmul (poolTotalLP F fzero flt p) (poolReserveY F fzero flt p)))
+      (fdiv lp (poolTotalLP F fzero flt p))
+      (divDiv F fadd fmul fsub fdiv fneg finv fzero fone flt A
+        (fmul lp (poolReserveY F fzero flt p)) (poolTotalLP F fzero flt p) (poolReserveY F fzero flt p)
+        (poolTotalLPNeZero F fadd fmul fsub fdiv fneg finv fzero fone flt A p)
+        (poolReserveYNeZero F fadd fmul fsub fdiv fneg finv fzero fone flt A p))
+      (mulDivMulRight F fadd fmul fsub fdiv fneg finv fzero fone flt A
+        lp (poolTotalLP F fzero flt p) (poolReserveY F fzero flt p)
+        (poolTotalLPNeZero F fadd fmul fsub fdiv fneg finv fzero fone flt A p)
+        (poolReserveYNeZero F fadd fmul fsub fdiv fneg finv fzero fone flt A p))
+
+check redeemProportionalY
+
+def addRemoveRoundtripX :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (p : Pool F fzero flt) -> (dx : F) -> (hdx : flt fzero dx) ->
+  Eq F (redeemX F fadd fmul fsub fdiv fneg finv fzero fone flt (addLiquidity F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))) dx :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx =>
+    subst0 F
+      (fmul dx (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))))
+      (fmul (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (fadd (poolReserveX F fzero flt p) dx))
+      (fun z => Eq F (fdiv z (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)))) dx)
+      (sym0 F
+        (fmul (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (fadd (poolReserveX F fzero flt p) dx))
+        (fmul dx (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))))
+        (lpShareCross F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx))
+      (mulDivCancelRight F fadd fmul fsub fdiv fneg finv fzero fone flt A dx (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))) (deriveNeOfGt F fadd fmul fsub fdiv fneg finv fzero fone flt A (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))) (addLiquidityHlp F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx)))
+
+check addRemoveRoundtripX
+
+def addRemoveRoundtripY :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (p : Pool F fzero flt) -> (dx : F) -> (hdx : flt fzero dx) ->
+  Eq F (redeemY F fadd fmul fsub fdiv fneg finv fzero fone flt (addLiquidity F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p)) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx =>
+    trans0 F
+      (fdiv (fmul (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p)))) (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))))
+      (fdiv (fmul (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))) (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))))
+      (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))
+      (cong0 F F
+        (fmul (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))))
+        (fmul (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)))
+        (fun z => fdiv z (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))))
+        (deriveMulComm F fadd fmul fsub fdiv fneg finv fzero fone flt A (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p)))))
+      (trans0 F
+        (fdiv (fmul (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))) (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))))
+        (fmul (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fdiv (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)))))
+        (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))
+        (sym0 F
+          (fmul (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fdiv (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)))))
+          (fdiv (fmul (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))) (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))))
+          (deriveMulDivAssoc F fadd fmul fsub fdiv fneg finv fzero fone flt A (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)))))
+        (trans0 F
+          (fmul (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fdiv (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)))))
+          (fmul (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fdiv dx (fadd (poolReserveX F fzero flt p) dx)))
+          (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))
+          (cong0 F F
+            (fdiv (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p)) (fadd (poolTotalLP F fzero flt p) (fdiv (fmul dx (poolTotalLP F fzero flt p)) (poolReserveX F fzero flt p))))
+            (fdiv dx (fadd (poolReserveX F fzero flt p) dx))
+            (fun z => fmul (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) z)
+            (lpShareProportional F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx))
+          (trans0 F
+            (fmul (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fdiv dx (fadd (poolReserveX F fzero flt p) dx)))
+            (fdiv (fmul (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) dx) (fadd (poolReserveX F fzero flt p) dx))
+            (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))
+            (deriveMulDivAssoc F fadd fmul fsub fdiv fneg finv fzero fone flt A (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) dx (fadd (poolReserveX F fzero flt p) dx))
+            (trans0 F
+              (fdiv (fmul (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) dx) (fadd (poolReserveX F fzero flt p) dx))
+              (fdiv (fmul dx (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p)))) (fadd (poolReserveX F fzero flt p) dx))
+              (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))
+              (cong0 F F
+                (fmul (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) dx)
+                (fmul dx (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))))
+                (fun z => fdiv z (fadd (poolReserveX F fzero flt p) dx))
+                (deriveMulComm F fadd fmul fsub fdiv fneg finv fzero fone flt A (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) dx))
+              (trans0 F
+                (fdiv (fmul dx (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p)))) (fadd (poolReserveX F fzero flt p) dx))
+                (fmul dx (fdiv (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fadd (poolReserveX F fzero flt p) dx)))
+                (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))
+                (sym0 F
+                  (fmul dx (fdiv (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fadd (poolReserveX F fzero flt p) dx)))
+                  (fdiv (fmul dx (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p)))) (fadd (poolReserveX F fzero flt p) dx))
+                  (deriveMulDivAssoc F fadd fmul fsub fdiv fneg finv fzero fone flt A dx (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fadd (poolReserveX F fzero flt p) dx)))
+                (trans0 F
+                  (fmul dx (fdiv (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fadd (poolReserveX F fzero flt p) dx)))
+                  (fmul dx (fdiv (poolReserveY F fzero flt p) (poolReserveX F fzero flt p)))
+                  (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))
+                  (cong0 F F
+                    (fdiv (fadd (poolReserveY F fzero flt p) (fdiv (fmul dx (poolReserveY F fzero flt p)) (poolReserveX F fzero flt p))) (fadd (poolReserveX F fzero flt p) dx))
+                    (fdiv (poolReserveY F fzero flt p) (poolReserveX F fzero flt p))
+                    (fun z => fmul dx z)
+                    (addLiquidityPreservesRatio F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx))
+                  (deriveMulDivAssoc F fadd fmul fsub fdiv fneg finv fzero fone flt A dx (poolReserveY F fzero flt p) (poolReserveX F fzero flt p))))))))
+
+check addRemoveRoundtripY

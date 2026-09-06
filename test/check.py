@@ -12,7 +12,8 @@ DEFAULT_TOT = Path("/Users/oobi/Documents/kan-lang-tot-pin/"
                    "_build/default/bin/tot.exe")
 TOT = Path(os.environ.get("TOT", DEFAULT_TOT))
 NAMES = ["Foundation", "Field", "Invariant", "Axioms", "Ring", "Laws",
-         "Compose", "Frac", "Order", "Pool", "Basic", "Product", "NoDrain"]
+         "Compose", "Frac", "Order", "Pool", "Basic", "Product", "NoDrain",
+         "PriceImpact", "Liquidity"]
 FILES = {name: (ROOT / "src" / f"{name}.tot").read_text() for name in NAMES}
 FIELD = FILES["Field"]
 INVARIANT = FILES["Invariant"]
@@ -23,7 +24,7 @@ ORDER = FILES["Order"]
 POOL = FILES["Pool"]
 
 def concatenate(**changed):
-    """Return the thirteen sources in check order, with the named ones replaced."""
+    """Return the fifteen sources in check order, with the named ones replaced."""
     return "\n".join(changed.get(name, FILES[name]) for name in NAMES)
 
 BASE = concatenate()
@@ -471,6 +472,157 @@ M3C_NEGATIVES = [
      "constantProductLowerBound"),
 ]
 
+# The M3d abbreviations, spelled out as src/PriceImpact.tot and
+# src/Liquidity.tot spell them. AL is the pool after addLiquidity, MINT
+# is the minted LP amount and LPN is the total LP after addLiquidity.
+AL = f"(addLiquidity {OPS} A p dx hdx)"
+EP = f"(effectivePrice {OPS} p dx)"
+EP1 = f"(effectivePrice {OPS} p dx1)"
+EP2 = f"(effectivePrice {OPS} p dx2)"
+SP = f"(spotPrice {OPS} p)"
+RXD = f"(fadd {RX} dx)"
+RXA = f"(poolReserveX F fzero flt {AL})"
+MINT = f"(fdiv (fmul dx {LPT}) {RX})"
+LPN = f"(fadd {LPT} {MINT})"
+RATIO_LHS = f"""(fdiv
+      (poolReserveY F fzero flt
+        {AL})
+      (poolReserveX F fzero flt
+        {AL}))"""
+
+# The thirteen result-type negatives and the four proof negatives of
+# src/PriceImpact.tot and src/Liquidity.tot that M3d adds:
+# (case, file, def, old, new, failing def). The first thirteen change the
+# result type of a theorem and keep the proof. The last four keep the
+# result type and change the proof. Every anchor of a result type takes
+# the trailing ":=" of the def header, so the count stays 1 and no step
+# of the body changes.
+M3D_NEGATIVES = [
+    ("wrong-effectiveprice-eq", "PriceImpact", "effectivePriceEq",
+     f"""  Eq F
+    {EP}
+    (fdiv {RY} {RXD}) :=""",
+     f"""  Eq F
+    (fdiv {RY} {RXD})
+    {EP} :=""",
+     "effectivePriceEq"),
+    ("wrong-effectiveprice-lt-spot", "PriceImpact", "effectivePriceLtSpot",
+     f"""  flt
+    {EP}
+    {SP} :=""",
+     f"""  flt
+    {SP}
+    {EP} :=""",
+     "effectivePriceLtSpot"),
+    ("wrong-effectiveprice-decreasing", "PriceImpact",
+     "effectivePriceDecreasing",
+     f"""  flt
+    {EP2}
+    {EP1} :=""",
+     f"""  flt
+    {EP1}
+    {EP2} :=""",
+     "effectivePriceDecreasing"),
+    ("wrong-effectiveprice-le-spot", "PriceImpact", "effectivePriceLeSpot",
+     f"""  fle F flt
+    {EP}
+    {SP} :=""",
+     f"""  fle F flt
+    {SP}
+    {EP} :=""",
+     "effectivePriceLeSpot"),
+    ("wrong-effectiveprice-pos", "PriceImpact", "effectivePricePos",
+     f"  flt fzero {EP} :=",
+     f"  flt {EP} fzero :=",
+     "effectivePricePos"),
+    ("wrong-addliquidity-preserves-ratio", "Liquidity",
+     "addLiquidityPreservesRatio",
+     f"""  Eq F
+    {RATIO_LHS}
+    (fdiv {RY} {RX}) :=""",
+     f"""  Eq F
+    (fdiv {RY} {RX})
+    {RATIO_LHS} :=""",
+     "addLiquidityPreservesRatio"),
+    ("wrong-addliquidity-preserves-price", "Liquidity",
+     "addLiquidityPreservesPrice",
+     f"""  Eq F
+    (spotPrice {OPS}
+      {AL})
+    {SP} :=""",
+     f"""  Eq F
+    {SP}
+    (spotPrice {OPS}
+      {AL}) :=""",
+     "addLiquidityPreservesPrice"),
+    ("wrong-lpshare-cross", "Liquidity", "lpShareCross",
+     f"""  Eq F
+    (fmul {MINT} {RXD})
+    (fmul dx {LPN}) :=""",
+     f"""  Eq F
+    (fmul dx {LPN})
+    (fmul {MINT} {RXD}) :=""",
+     "lpShareCross"),
+    ("wrong-lpshare-proportional", "Liquidity", "lpShareProportional",
+     f"    (fdiv dx {RXA}) :=",
+     f"    (fdiv {RXA} dx) :=",
+     "lpShareProportional"),
+    ("wrong-redeem-proportional-x", "Liquidity", "redeemProportionalX",
+     f"    (fdiv lp {LPT}) :=",
+     f"    (fdiv {LPT} lp) :=",
+     "redeemProportionalX"),
+    ("wrong-redeem-proportional-y", "Liquidity", "redeemProportionalY",
+     f"    (fdiv lp {LPT}) :=",
+     f"    (fdiv {LPT} lp) :=",
+     "redeemProportionalY"),
+    ("wrong-add-remove-roundtrip-x", "Liquidity", "addRemoveRoundtripX",
+     f"  Eq F (redeemX {OPS} {AL} {MINT}) dx :=",
+     f"  Eq F (redeemX {OPS} {AL} {MINT}) {RX} :=",
+     "addRemoveRoundtripX"),
+    ("wrong-add-remove-roundtrip-y", "Liquidity", "addRemoveRoundtripY",
+     f"  Eq F (redeemY {OPS} {AL} {MINT}) (fdiv (fmul dx {RY}) {RX}) :=",
+     f"  Eq F (redeemY {OPS} {AL} {MINT}) (fdiv (fmul dx {RX}) {RY}) :=",
+     "addRemoveRoundtripY"),
+    ("wrong-effectiveprice-eq-proof", "PriceImpact", "effectivePriceEq",
+     f"""      (mulDivMulRight {OPS} A
+        {RY}
+        {RXD}
+        dx""",
+     f"""      (mulDivMulRight {OPS} A
+        {RXD}
+        {RY}
+        dx""",
+     "effectivePriceEq"),
+    ("wrong-effectiveprice-lt-spot-notransport", "PriceImpact",
+     "effectivePriceLtSpot",
+     f"""    subst0 F
+      (fdiv {RY} {RXD})
+      {EP}
+      (fun z => flt z (fdiv {RY} {RX}))
+      (sym0 F
+        {EP}
+        (fdiv {RY} {RXD})
+        (effectivePriceEq {OPS} A p dx hdx))
+""",
+     "",
+     "effectivePriceLtSpot"),
+    ("wrong-lpshare-proportional-proof", "Liquidity", "lpShareProportional",
+     f"""      (deriveNeOfGt {OPS} A {LPN}
+        (addLiquidityHlp {OPS} A p dx hdx))
+      (reserveXAddNeZero {OPS} A p dx hdx)""",
+     f"""      (reserveXAddNeZero {OPS} A p dx hdx)
+      (deriveNeOfGt {OPS} A {LPN}
+        (addLiquidityHlp {OPS} A p dx hdx))""",
+     "lpShareProportional"),
+    ("wrong-roundtrip-x-nosym", "Liquidity", "addRemoveRoundtripX",
+     f"""      (sym0 F
+        (fmul {MINT} {RXD})
+        (fmul dx {LPN})
+        (lpShareCross {OPS} A p dx hdx))""",
+     f"      (lpShareCross {OPS} A p dx hdx)",
+     "addRemoveRoundtripX"),
+]
+
 # A case is (name, full source, expected diagnostic word).
 # None: the checker must accept. A string: the checker must exit with
 # status 1 and print that string in its diagnostic.
@@ -531,7 +683,11 @@ CASES = [
     # The ten result-type negatives and the three proof negatives of
     # src/Product.tot and src/NoDrain.tot that M3c adds.
 ] + [(name, mutate_in_def(file_name, def_name, old, new), "mismatch")
-     for name, file_name, def_name, old, new, _failing in M3C_NEGATIVES]
+     for name, file_name, def_name, old, new, _failing in M3C_NEGATIVES] + [
+    # The thirteen result-type negatives and the four proof negatives of
+    # src/PriceImpact.tot and src/Liquidity.tot that M3d adds.
+    (name, mutate_in_def(file_name, def_name, old, new), "mismatch")
+    for name, file_name, def_name, old, new, _failing in M3D_NEGATIVES]
 
 # The def that must fail first, for every case that M3a adds. The name
 # comes from the position of the diagnostic, so a mutation that moves the
@@ -550,6 +706,8 @@ FAILING_DEFS = {
     "weak-feerate-hlt": "feeComplementPos",
     **{name: failing
        for name, _file, _def_name, _old, _new, failing in M3C_NEGATIVES},
+    **{name: failing
+       for name, _file, _def_name, _old, _new, failing in M3D_NEGATIVES},
 }
 
 def failing_def(source, result):

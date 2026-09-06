@@ -9,8 +9,10 @@ eight field laws that the Lean proof cites, and once against a record of
 seventeen ordered-field axioms, from which the eight laws are derived.
 The port also states the AMM itself: the two data records of
 `AmmLean/Basic.lean`, its nine definitions and its eight theorems. It
-also proves the four remaining theorems of `AmmLean/Invariant.lean` and
-the six theorems of `AmmLean/NoDrain.lean`.
+also proves the four remaining theorems of `AmmLean/Invariant.lean`, the
+six theorems of `AmmLean/NoDrain.lean`, the five theorems of
+`AmmLean/PriceImpact.lean` and the seven theorems of
+`AmmLean/Liquidity.lean`. Every theorem of amm-lean is ported.
 
 ## Check
 
@@ -22,7 +24,7 @@ Run from this directory. The runner uses the checker named by `TOT` when
 that variable is set. Otherwise it uses the pinned checker at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe` and
 stops with a message when that file is absent. The runner concatenates
-the thirteen source files of `src`, in the order in which the Sources line
+the fifteen source files of `src`, in the order in which the Sources line
 at the end of
 this file names them, in temporary files and checks with `--no-prelude --no-axioms`. It prints the checker
 SHA-256, so validation identifies the binary actually used. No compiler
@@ -72,6 +74,13 @@ equality chain.
 
 `neOfGt` states the disequality as a function to `Empty`, because tot has
 no `Ne` and no `Prop`.
+
+Every theorem of amm-lean is ported. The pilot proves
+`swap_output_identity`, M3b proves the eight theorems of
+`AmmLean/Basic.lean`, M3c proves the four remaining theorems of
+`AmmLean/Invariant.lean` and the six theorems of `AmmLean/NoDrain.lean`,
+and M3d proves the five theorems of `AmmLean/PriceImpact.lean` and the
+seven theorems of `AmmLean/Liquidity.lean`. That is thirty-one theorems.
 
 ### The same identity from seventeen axioms
 
@@ -396,6 +405,63 @@ keeps the structure of the Lean proof, which applies `sub_pos.mpr` to
 `subPosOfLt`, and `swapOutputWithFeeLtReserveY` is the inner chain of
 `swapWithFeeHy` without its outer `subPosOfLt`.
 
+## Price impact and liquidity
+
+Two files hold the twelve theorems that M3d ports. `src/PriceImpact.tot`
+holds the five theorems of `AmmLean/PriceImpact.lean`, and
+`src/Liquidity.tot` holds the seven theorems of `AmmLean/Liquidity.lean`
+and one helper def. There are two files and not one, because they mirror
+the two Lean files one for one. `src/PriceImpact.tot` comes before
+`src/Liquidity.tot` in the check order, as `Liquidity.lean` comes after
+`PriceImpact.lean` in the Lean import order, although no def of
+`src/Liquidity.tot` cites a def of `src/PriceImpact.tot`.
+
+| Lean name | tot name | Lean line | Mathlib lemmas | tot lemmas or axiom fields | transports |
+| --- | --- | --- | --- | --- | --- |
+| `effective_price_eq` | `effectivePriceEq` | 56 | `div_div`, `mul_div_mul_right` | `divDiv`, `mulDivMulRight`, `reserveXAddNeZero`, `deriveNeOfGt` | 0 |
+| `effective_price_lt_spot` | `effectivePriceLtSpot` | 71 | `div_lt_div_of_pos_left`, `lt_add_of_pos_right` | `divLtDivOfPosLeft`, `ltAddOfPosRight`, `effectivePriceEq` | 1 |
+| `effective_price_decreasing` | `effectivePriceDecreasing` | 89 | `div_lt_div_of_pos_left`, `add_pos`, `add_lt_add_iff_left` | `divLtDivOfPosLeft`, `reserveXAddPos`, axiom field `addLtAddLeft`, `effectivePriceEq` | 2 |
+| `effective_price_le_spot` | `effectivePriceLeSpot` | 104 | `le_of_lt` | `leOfLt`, `effectivePriceLtSpot` | 0 |
+| `effective_price_pos` | `effectivePricePos` | 111 | `div_pos`, `add_pos` | `divPos`, `reserveXAddPos`, `effectivePriceEq` | 1 |
+| `add_liquidity_preserves_ratio` | `addLiquidityPreservesRatio` | 64 | `div_eq_div_iff`, `add_mul`, `div_mul_cancel`, `mul_add`, `mul_comm` | `divEqDivOfMulEq`, `deriveAddMul`, `divMulCancel`, `deriveMulComm`, axiom field `mulAdd`, `reserveXAddNeZero`, `poolReserveXNeZero` | 2 |
+| `add_liquidity_preserves_price` | `addLiquidityPreservesPrice` | 78 | none, it is a direct corollary | `addLiquidityPreservesRatio` | 0 |
+| none, the helper of `lp_share_proportional` | `lpShareCross` | 91 | `mul_add`, `div_mul_cancel`, `mul_comm`, `mul_add` | axiom field `mulAdd`, `divMulCancel`, `deriveMulComm`, `poolReserveXNeZero` | 2 |
+| `lp_share_proportional` | `lpShareProportional` | 91 | `div_eq_div_iff .mpr` | `divEqDivOfMulEq`, `lpShareCross`, `deriveNeOfGt`, `addLiquidityHlp`, `reserveXAddNeZero` | 0 |
+| `redeem_proportional_x` | `redeemProportionalX` | 113 | `div_div`, `mul_div_mul_right` | `divDiv`, `mulDivMulRight`, `poolTotalLPNeZero`, `poolReserveXNeZero` | 0 |
+| `redeem_proportional_y` | `redeemProportionalY` | 118 | `div_div`, `mul_div_mul_right` | `divDiv`, `mulDivMulRight`, `poolTotalLPNeZero`, `poolReserveYNeZero` | 0 |
+| `add_remove_roundtrip_x` | `addRemoveRoundtripX` | 134 | `div_eq_div_iff .mp`, `mul_div_cancel_right` | `lpShareCross`, `mulDivCancelRight`, `deriveNeOfGt`, `addLiquidityHlp` | 1 |
+| `add_remove_roundtrip_y` | `addRemoveRoundtripY` | 147 | `mul_comm`, `mul_div_assoc`, `mul_div_assoc` prime, and the two earlier theorems | `deriveMulComm`, `deriveMulDivAssoc`, `lpShareProportional`, `addLiquidityPreservesRatio` | 4 `cong0` in 7 `trans0` |
+
+The Lean line is the line of the `theorem` keyword in the Lean file.
+`lpShareCross` has no Lean name of its own, and it comes from the
+`kan_rw` list of `lp_share_proportional` at line 91. The transports
+column counts the `subst0` occurrences of the tot proof, except in the
+last row, which counts the `cong0` steps of the chain.
+
+`effectivePrice` unfolds twice: the delta step of `effectivePrice` gives
+`fdiv (swapOutput OPS p dx) dx`, and the delta step of `swapOutput` then
+gives `fdiv (fdiv (fmul ry dx) (fadd rx dx)) dx`. `effectivePriceEq`
+folds that unfolding into one identity, and the other four theorems of
+`src/PriceImpact.tot` transport along it.
+
+The statements of `src/Liquidity.tot` name the projections of
+`addLiquidity PARAMS p dx hdx`, as Lean names
+`(addLiquidity p dx hdx).reserveY`. `addLiquidity` is a reducible def
+whose body is one pool constructor application, so the delta step of the
+constructor and the iota step of the projection match unfold the
+projections by conversion. No unfolding lemma is cited.
+
+tot has no iff, so `lpShareCross` holds the cross-multiplied identity
+that Lean reads off `lp_share_proportional` with `div_eq_div_iff`. It is
+a def of its own, and `lpShareProportional` and `addRemoveRoundtripX`
+both cite it.
+
+`effectivePricePos` keeps the structure of the Lean proof, which rewrites
+by `effective_price_eq` and then applies `div_pos`. The design notes name
+a shorter alternative, the one call
+`divPos PARAMS out dx (swapOutputPos PARAMS p dx hdx) hdx`, which the
+port does not use.
+
 ## Measurement
 
 | Quantity | Lean | tot, pilot | tot, record |
@@ -501,7 +567,8 @@ the Lean text. Blank lines, comment lines and doc comments are excluded
 from all four counts. The pilot theorem costs 55 tot lines in its record
 form against 5 Lean lines, which is 11 times the Lean text, so the
 per-theorem overhead falls once the libraries exist. That is the
-question of Next milestone 2 above.
+question of the M3d item of Next milestones, and the M3d counts below
+answer it again.
 
 M3c adds no library lemma and no axiom. Every lemma that the ten
 theorems cite is a lemma that M2, M3a or M3b already proved, and every
@@ -526,8 +593,63 @@ form of `swapPreservesProduct` inside `constantProductLowerBound`. No
 def of either file holds a `trans0` or a `cong0`, because no theorem
 chains two equalities.
 
-`test/check.py` runs in about 2.4 seconds of wall time on the pinned
-checker, for all eighty cases.
+`AmmLean/PriceImpact.lean` and `AmmLean/Liquidity.lean` against the two
+files that port their twelve theorems.
+
+| Quantity | `AmmLean/PriceImpact.lean` | `src/PriceImpact.tot` | `AmmLean/Liquidity.lean` | `src/Liquidity.tot` |
+| --- | --- | --- | --- | --- |
+| Lines | 116 | 151 | 171 | 293 |
+| Theorems | 5 | 5 | 7 | 8 |
+
+The eight defs of `src/Liquidity.tot` are the seven theorems and the
+helper `lpShareCross`. Every def of both files is a plain def, because
+no statement of M3d reads the unfolding of an M3d def.
+
+The five theorems of `AmmLean/PriceImpact.lean` hold 23 Lean lines, and
+the five tot defs hold 126 lines without their five `check` lines, which
+is 5.5 times the Lean text. The seven theorems of
+`AmmLean/Liquidity.lean` hold 67 Lean lines, and the eight tot defs hold
+257 lines without their eight `check` lines, which is 3.8 times the Lean
+text. Blank lines, comment lines and doc comments are excluded from all
+four counts.
+
+The whole port is thirty-one theorems: one in the pilot, eight in M3b,
+ten in M3c and twelve in M3d, each count taken from the tables above.
+The pilot theorem costs 11 times the Lean text in its record form. M3c
+costs 2.9 times it in `src/Product.tot` and 5.3 times it in
+`src/NoDrain.tot`, and M3d costs 5.5 times it in `src/PriceImpact.tot`
+and 3.8 times it in `src/Liquidity.tot`. The per-theorem overhead
+therefore fell once the libraries existed, from 11 times the Lean text
+to a band of 2.9 to 5.5 times it, and it did not fall further in M3d.
+That answers the question of the former Next milestone 1.
+
+M3d adds no library lemma and no axiom. Every lemma that the twelve
+theorems cite is a lemma that M2, M3a, M3b or M3c already proved, and
+the one new def that is not a Lean theorem is `lpShareCross`.
+
+The two files of M3d, in proof-term occurrences. Comment lines are
+excluded from the counts.
+
+| file | lines | `trans0` | `cong0` | `sym0` | `subst0` |
+| --- | --- | --- | --- | --- | --- |
+| `src/PriceImpact.tot` | 151 | 1 | 0 | 4 | 4 |
+| `src/Liquidity.tot` | 293 | 11 | 4 | 5 | 5 |
+
+The one `trans0` of `src/PriceImpact.tot` joins the two fraction lemmas
+of `effectivePriceEq`. Its four `subst0`, each over one `sym0` of
+`effectivePriceEq`, are the transports of the other four theorems: one
+in `effectivePriceLtSpot`, two in `effectivePriceDecreasing` and one in
+`effectivePricePos`. `effectivePriceLeSpot` holds no transport, because
+it is one call of `leOfLt`. The eleven `trans0` of `src/Liquidity.tot`
+are one in each of `addLiquidityPreservesRatio`, `lpShareCross`,
+`redeemProportionalX` and `redeemProportionalY`, and seven in
+`addRemoveRoundtripY`. The four `cong0` are the four steps of
+`addRemoveRoundtripY` that rewrite under an `fdiv` context or an `fmul`
+context. The five `subst0` are two in `addLiquidityPreservesRatio`, two
+in `lpShareCross` and one in `addRemoveRoundtripX`.
+
+`test/check.py` runs in about 4.0 seconds of wall time on the pinned
+checker, for all ninety-seven cases.
 
 ## Scope and trust
 
@@ -551,15 +673,16 @@ their metatheoretic soundness.
 
 The port covers one theorem, in two forms, the eight theorems of
 `AmmLean/Basic.lean`, the four remaining theorems of
-`AmmLean/Invariant.lean` and the six theorems of `AmmLean/NoDrain.lean`.
-The other twelve theorems of amm-lean are not ported. The order and fraction library holds thirty-six
+`AmmLean/Invariant.lean`, the six theorems of `AmmLean/NoDrain.lean`, the
+five theorems of `AmmLean/PriceImpact.lean` and the seven theorems of
+`AmmLean/Liquidity.lean`. Every theorem of amm-lean is ported. The order and fraction library holds thirty-six
 lemmas that those theorems cite. It declares no axiom of its own: every
 lemma is a def with a proof term, and the only new hypotheses are the
 three fields that the record gained.
 
 ## Validation
 
-On 2026-09-06, all eighty checks passed with checker SHA-256
+On 2026-09-06, all ninety-seven checks passed with checker SHA-256
 `30c4524d57f6723e39ba117097222f3ab8ef3e899a8a4af8b7e60c68337842bf` at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe`,
 built from tot commit `8cf0b8b` with a clean tree. Build that commit to
@@ -568,7 +691,7 @@ reproduce the reference checker.
 The checker reports every rejection in this repository with the word
 `mismatch`, except the axiom case, which reports `axiom`.
 
-The eighty checks:
+The ninety-seven checks:
 
 - The theorem checks without a prelude or axioms.
 - The proof is rejected against a commuted right side, `fmul y x`.
@@ -669,8 +792,39 @@ The eighty checks:
   `swapWithFeeIncreasesProduct`, and `wrong-lowerbound-nosym` removes
   the `sym0` of `constantProductLowerBound` and is rejected at
   `constantProductLowerBound`.
+- Thirteen checks, one for each theorem of `src/PriceImpact.tot` and
+  `src/Liquidity.tot` and one for the helper `lpShareCross`. Each check
+  changes the result type and keeps the proof, so each one is rejected
+  at its own def: `wrong-effectiveprice-eq` at `effectivePriceEq`,
+  `wrong-effectiveprice-lt-spot` at `effectivePriceLtSpot`,
+  `wrong-effectiveprice-decreasing` at `effectivePriceDecreasing`,
+  `wrong-effectiveprice-le-spot` at `effectivePriceLeSpot`,
+  `wrong-effectiveprice-pos` at `effectivePricePos`,
+  `wrong-addliquidity-preserves-ratio` at
+  `addLiquidityPreservesRatio`,
+  `wrong-addliquidity-preserves-price` at
+  `addLiquidityPreservesPrice`, `wrong-lpshare-cross` at
+  `lpShareCross`, `wrong-lpshare-proportional` at
+  `lpShareProportional`, `wrong-redeem-proportional-x` at
+  `redeemProportionalX`, `wrong-redeem-proportional-y` at
+  `redeemProportionalY`, `wrong-add-remove-roundtrip-x` at
+  `addRemoveRoundtripX` and `wrong-add-remove-roundtrip-y` at
+  `addRemoveRoundtripY`. The anchor of each one takes the `:=` of the
+  def header, so the count of the mutation stays one and no step of the
+  body changes.
+- Four checks keep the statement and break the proof, so each one is
+  rejected at its own def: `wrong-effectiveprice-eq-proof` exchanges the
+  two arguments of `mulDivMulRight` in `effectivePriceEq` and is
+  rejected at `effectivePriceEq`,
+  `wrong-effectiveprice-lt-spot-notransport` removes the `subst0`
+  wrapper of `effectivePriceLtSpot` and is rejected at
+  `effectivePriceLtSpot`, `wrong-lpshare-proportional-proof` exchanges
+  the two nonzero proofs of `lpShareProportional` and is rejected at
+  `lpShareProportional`, and `wrong-roundtrip-x-nosym` removes the
+  `sym0` of `addRemoveRoundtripX` and passes the cross identity to
+  `subst0` directly, and is rejected at `addRemoveRoundtripX`.
 
-For the forty-nine checks that M3a, M3b and M3c add, the runner also
+For the sixty-six checks that M3a, M3b, M3c and M3d add, the runner also
 reads
 the position
 of the diagnostic and confirms the name of the first failing def. A
@@ -694,10 +848,11 @@ above.
 
 ## Probe results
 
-Sixteen facts about tot, found with scratch files. The first five come
+Nineteen facts about tot, found with scratch files. The first five come
 from the record milestone, the next five come from the M3a probes, the
-next four come from the M3b probes and the last two come from the M3c
-probes. The scratch files are not part of this repository.
+next four come from the M3b probes, the next two come from the M3c
+probes and the last three come from the M3d probes. The scratch files
+are not part of this repository.
 
 - A data record that bundles the eight field laws checks when the law
   fields carry quantity w. When the fields carry quantity 0 and a def
@@ -769,24 +924,48 @@ probes. The scratch files are not part of this repository.
   and cites `leOfEq` over `sym0` of `swapPreservesProduct`. The control
   removes the `sym0` and passes the proof of `swapPreservesProduct`
   straight into `leOfEq`, and the checker rejects it.
+- A `trans0` chain proves a statement through a def that unfolds twice.
+  `effectivePriceEq` states
+  `Eq F (effectivePrice OPS p dx) (fdiv ry rxD)`, and the delta step of
+  `effectivePrice` and then the delta step of `swapOutput` carry the
+  statement to the type of one `trans0` over `divDiv` and
+  `mulDivMulRight`. No unfolding lemma is cited and no `subst0` is
+  written. The control swaps the two endpoints of the `Eq` and the
+  checker rejects it with a type mismatch.
+- A theorem may be stated on the projections of
+  `addLiquidity PARAMS p dx hdx`, and another on `spotPrice OPS` of the
+  same application. `addLiquidityPreservesRatio` names `poolReserveY`
+  and `poolReserveX` of the constructor, and its term is stated on the
+  unfolded reserves; the delta step of the reducible constructor with
+  the iota step of the two projection matches closes the gap.
+  `addLiquidityPreservesPrice` is that term with no wrapper, because the
+  delta step of `spotPrice` on both sides gives the ratio statement. The
+  control exchanges the two nonzero proofs and the checker rejects it.
+- `cong0` rewrites under an `fdiv` context and under an `fmul` context
+  over equations whose endpoints are stated in the projection form. In
+  `addRemoveRoundtripY` the `cong0` endpoints stand in the unfolded
+  forms `fdiv mint lpN`, `fdiv dx rxD`, `fdiv ryN rxD` and
+  `fdiv ry rx`, while the cited `lpShareProportional` and
+  `addLiquidityPreservesRatio` have types that name the projections of
+  `addLiquidity`. The checker converts them. The control drops one
+  `trans0` layer of the chain and the checker rejects it.
 
 The five M3c probes Q1 to Q5 were all green on the first attempt, so
 they forced no change to any statement and no change to any term of the
-design notes.
+design notes. The six M3d probes R1 to R6 were all green on the first
+attempt as well, so they forced no change either. Neither fallback of
+the `addRemoveRoundtripY` design note was needed: the `cong0` endpoints
+stand in the unfolded form, and no `subst0` replaces a `cong0` step.
 
 ## Next milestones
 
-1. M3d: the five theorems of `AmmLean/PriceImpact.lean` and the seven
-   theorems of `AmmLean/Liquidity.lean`. M3c ported ten theorems, and
-   M3d ports the remaining twelve theorems of amm-lean. Measure whether
-   the per-theorem overhead falls further once the record, the
-   derivation library and the order and fraction library exist.
-2. Supply a concrete carrier: an inhabitant of `OrderedField` for one
+1. Supply a concrete carrier: an inhabitant of `OrderedField` for one
    type, so that both theorems have a closed instance. tot has no
    rationals, so the carrier is a milestone of its own.
 
-Sources, fifteen files: `src/Foundation.tot`, `src/Field.tot`,
+Sources, seventeen files: `src/Foundation.tot`, `src/Field.tot`,
 `src/Invariant.tot`, `src/Axioms.tot`, `src/Ring.tot`, `src/Laws.tot`,
 `src/Compose.tot`, `src/Frac.tot`, `src/Order.tot`, `src/Pool.tot`,
-`src/Basic.tot`, `src/Product.tot`, `src/NoDrain.tot`, `test/check.py`,
-`README.md`. The first thirteen are the check order.
+`src/Basic.tot`, `src/Product.tot`, `src/NoDrain.tot`,
+`src/PriceImpact.tot`, `src/Liquidity.tot`, `test/check.py`,
+`README.md`. The first fifteen are the check order.
