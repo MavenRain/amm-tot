@@ -1,4 +1,4 @@
-"""Check the swap identity, its derivation from axioms, and the rejection controls."""
+"""Check the swap identity, the order and fraction library, and the rejection controls."""
 from pathlib import Path
 import hashlib
 import os
@@ -10,15 +10,18 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TOT = Path("/Users/oobi/Documents/kan-lang-tot-pin/"
                    "_build/default/bin/tot.exe")
 TOT = Path(os.environ.get("TOT", DEFAULT_TOT))
-NAMES = ["Foundation", "Field", "Invariant", "Axioms", "Ring", "Laws", "Compose"]
+NAMES = ["Foundation", "Field", "Invariant", "Axioms", "Ring", "Laws",
+         "Compose", "Frac", "Order"]
 FILES = {name: (ROOT / "src" / f"{name}.tot").read_text() for name in NAMES}
 FIELD = FILES["Field"]
 INVARIANT = FILES["Invariant"]
 AXIOMS = FILES["Axioms"]
 LAWS_SRC = FILES["Laws"]
+FRAC = FILES["Frac"]
+ORDER = FILES["Order"]
 
 def concatenate(**changed):
-    """Return the seven sources in check order, with the named ones replaced."""
+    """Return the nine sources in check order, with the named ones replaced."""
     return "\n".join(changed.get(name, FILES[name]) for name in NAMES)
 
 BASE = concatenate()
@@ -149,12 +152,30 @@ def mutate_axioms(old, new):
         raise SystemExit(f"anchor is not unique in Axioms.tot: {old!r}")
     return concatenate(Axioms=AXIOMS.replace(old, new))
 
-def def_span(name):
-    """Return the span of one def of Laws.tot, from its header to its check line."""
-    header = re.search(rf"^def {name}\b", LAWS_SRC, re.MULTILINE)
+def def_span(name, source=None, where="Laws.tot"):
+    """Return the span of one def, from its header to its check line."""
+    text = LAWS_SRC if source is None else source
+    header = re.search(rf"^def {name}\b", text, re.MULTILINE)
     if header is None:
-        raise SystemExit(f"def not found in Laws.tot: {name}")
-    return header.start(), LAWS_SRC.index(f"\ncheck {name}\n", header.start())
+        raise SystemExit(f"def not found in {where}: {name}")
+    return header.start(), text.index(f"\ncheck {name}\n", header.start())
+
+def mutate_in_def(file_name, def_name, old, new, count=1):
+    """Return BASE with one substring inside one def of one file replaced.
+
+    The count is exact. It guards the anchor of every new negative case:
+    the anchor ends with the ":=" of the def header, so it matches the
+    result type of the def and never a step of its body.
+    """
+    source = FILES[file_name]
+    start, end = def_span(def_name, source, f"{file_name}.tot")
+    block = source[start:end]
+    found = block.count(old)
+    if found != count:
+        raise SystemExit(f"anchor occurs {found} times, not {count}, "
+                         f"in {file_name}.tot def {def_name}: {old!r}")
+    changed = source[:start] + block.replace(old, new) + source[end:]
+    return concatenate(**{file_name: changed})
 
 def mutate_laws(name, old, new):
     """Return BASE with one exact substring inside one def of Laws.tot replaced."""
@@ -200,7 +221,60 @@ CASES = [
     ("axiom-rejected",
      BASE + "\naxiom fake : (0 F : Type 0) -> (a : F) -> (b : F) ->"
             " Eq F a b\n", "axiom"),
+    # The three axioms that M3a adds, weakened one at a time. Every proof
+    # stays unchanged, so the first def that reads the axiom fails.
+    ("weak-axiom-mulpos",
+     mutate_axioms("flt fzero (fmul a b)", "flt fzero a"), "mismatch"),
+    ("weak-axiom-lttrichotomy",
+     mutate_axioms(
+         "(ltTrichotomy : (a : F) -> (b : F) -> Trichotomy F flt a b)",
+         "(ltTrichotomy : (a : F) -> (b : F) -> Trichotomy F flt a a)"),
+     "mismatch"),
+    ("weak-axiom-zeroneone",
+     mutate_axioms("Eq F fzero fone", "Eq F fzero fzero"), "mismatch"),
+    # One lemma of the library at a time, with the result type changed and
+    # the proof kept. The proof proves the original statement, so the
+    # checker reports the mismatch at that def.
+    ("wrong-subpos",
+     mutate_in_def("Order", "subPosOfLt", "flt fzero (fsub a b) :=",
+                   "flt fzero (fsub b a) :="), "mismatch"),
+    ("wrong-divdiv",
+     mutate_in_def("Frac", "divDiv", "(fdiv a (fmul b c)) :=",
+                   "(fdiv a (fmul c b)) :="), "mismatch"),
+    ("wrong-invpos",
+     mutate_in_def("Order", "invPos", "flt fzero (finv a) :=",
+                   "flt (finv a) fzero :="), "mismatch"),
+    ("wrong-divltdiv",
+     mutate_in_def("Order", "divLtDivOfPosLeft",
+                   "flt (fdiv a b) (fdiv a c) :=",
+                   "flt (fdiv a c) (fdiv a b) :="), "mismatch"),
 ]
+
+# The def that must fail first, for every case that M3a adds. The name
+# comes from the position of the diagnostic, so a mutation that moves the
+# rejection to another def is a failure of the case.
+FAILING_DEFS = {
+    "weak-axiom-mulpos": "zeroLtOne",
+    "weak-axiom-lttrichotomy": "ltOfLtOfLe",
+    "weak-axiom-zeroneone": "zeroLtOne",
+    "wrong-subpos": "subPosOfLt",
+    "wrong-divdiv": "divDiv",
+    "wrong-invpos": "invPos",
+    "wrong-divltdiv": "divLtDivOfPosLeft",
+}
+
+def failing_def(source, result):
+    """Return the def that holds the position of the first diagnostic."""
+    position = re.search(r":(\d+):\d+:", result.stdout + result.stderr)
+    if position is None:
+        return None
+    line = int(position.group(1))
+    heads = [(number, head.group(1))
+             for number, text in enumerate(source.splitlines(), 1)
+             for head in [re.match(r"(?:reducible )?def (\w+)", text)]
+             if head is not None]
+    earlier = [name for number, name in heads if number <= line]
+    return earlier[-1] if earlier else None
 
 def run_case(directory, name, source):
     path = Path(directory) / f"{name}.tot"
@@ -227,7 +301,14 @@ def main():
             if not accepted(result, expected):
                 raise SystemExit(f"FAIL {name}: exit {result.returncode}\n"
                                  f"{result.stdout}\n{result.stderr}")
-            print(f"PASS {name}")
+            wanted = FAILING_DEFS.get(name)
+            found = None if wanted is None else failing_def(source, result)
+            if wanted is not None and found != wanted:
+                raise SystemExit(f"FAIL {name}: the first failing def is "
+                                 f"{found}, not {wanted}\n"
+                                 f"{result.stdout}\n{result.stderr}")
+            place = "" if wanted is None else f" (first failing def {wanted})"
+            print(f"PASS {name}{place}")
     print(f"PASS {len(CASES)} of {len(CASES)} cases")
 
 if __name__ == "__main__":

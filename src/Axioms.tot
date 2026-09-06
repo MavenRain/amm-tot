@@ -1,19 +1,30 @@
 -- The axioms of an ordered field, bundled into one record.
--- The record states, once, the fourteen Mathlib facts that the derivation
+-- The record states, once, the seventeen Mathlib facts that the derivation
 -- library reads. In Lean these facts arrive from instance resolution on
 -- Field F, LinearOrder F and IsStrictOrderedRing F. tot has no classes and
 -- no instances, so the facts are the fields of one hypothesis record.
 -- Mathlib sources, in field order: add_comm, add_assoc, add_zero,
 -- add_neg_cancel, mul_comm, mul_assoc, mul_one, mul_add, sub_eq_add_neg,
--- div_eq_mul_inv, mul_inv_cancel, lt_irrefl, lt_trans, add_lt_add_left.
+-- div_eq_mul_inv, mul_inv_cancel, lt_irrefl, lt_trans, add_lt_add_left,
+-- mul_pos, lt_trichotomy, zero_ne_one.
+-- The last three facts are axioms here for the same reason as the others:
+-- IsStrictOrderedRing gives mul_pos, LinearOrder gives lt_trichotomy, and the
+-- Nontrivial instance of the field gives zero_ne_one.
 -- The ten parameters carry the 0 marker, because a data type parameter must
--- carry that marker. The fourteen constructor fields carry quantity w,
+-- carry that marker. The seventeen constructor fields carry quantity w,
 -- because a def projects each one into a w position, and a 0 field fails on
 -- projection with an erased-variable-used-at-runtime error.
 -- The record has no projections. A def that needs a field destructures the
 -- record with one match.
 -- No inhabitant of OrderedField is supplied here. Every theorem that reads
 -- the record stays conditional on it.
+-- Trichotomy states lt_trichotomy: flt a b, Eq F a b, or flt b a.
+-- The three payloads carry w, so that a match arm may return them.
+data Trichotomy (0 F : Type 0) (0 flt : F -> F -> Type 0) (0 a : F) (0 b : F) : Type 0 :=
+  | isLt : (h : flt a b) -> Trichotomy F flt a b
+  | isEq : (e : Eq F a b) -> Trichotomy F flt a b
+  | isGt : (h : flt b a) -> Trichotomy F flt a b
+
 data OrderedField (0 F : Type 0) (0 fadd : F -> F -> F) (0 fmul : F -> F -> F)
     (0 fsub : F -> F -> F) (0 fdiv : F -> F -> F) (0 fneg : F -> F)
     (0 finv : F -> F) (0 fzero : F) (0 fone : F)
@@ -33,4 +44,7 @@ data OrderedField (0 F : Type 0) (0 fadd : F -> F -> F) (0 fmul : F -> F -> F)
     (ltIrrefl : (a : F) -> (0 h : flt a a) -> Empty) ->
     (ltTrans : (a : F) -> (b : F) -> (c : F) -> (0 h1 : flt a b) -> (0 h2 : flt b c) -> flt a c) ->
     (addLtAddLeft : (a : F) -> (b : F) -> (c : F) -> (0 h : flt b c) -> flt (fadd a b) (fadd a c)) ->
+    (mulPos : (a : F) -> (b : F) -> (0 ha : flt fzero a) -> (0 hb : flt fzero b) -> flt fzero (fmul a b)) ->
+    (ltTrichotomy : (a : F) -> (b : F) -> Trichotomy F flt a b) ->
+    (zeroNeOne : (0 e : Eq F fzero fone) -> Empty) ->
     OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt

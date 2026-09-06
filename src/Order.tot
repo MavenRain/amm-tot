@@ -1,0 +1,763 @@
+-- The order lemmas, derived from the axioms of src/Axioms.tot.
+-- fle is the not_lt form of the Mathlib order: fle F flt a b holds when a
+-- proof of flt b a gives Empty. exfalso eliminates Empty into any type,
+-- with an arm-less match and a return motive.
+-- Both are reducible def, because later statements read their unfoldings,
+-- and a plain def is opaque to conversion.
+-- The order lemmas follow, in seven parts. Each one takes the same
+-- eleven parameters as the defs of src/Ring.tot, then its own arguments,
+-- and destructures the record A with one match.
+
+reducible def exfalso :
+  (0 A : Type 0) -> (0 e : Empty) -> A :=
+  fun A e => match e as x return A with end
+
+check exfalso
+
+reducible def fle :
+  (0 F : Type 0) -> (0 flt : F -> F -> Type 0) -> (0 a : F) -> (0 b : F) -> Type 0 :=
+  fun F flt a b => (0 h : flt b a) -> Empty
+
+check fle
+
+def ltAsymm :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (h1 : flt a b) -> (0 h2 : flt b a) -> Empty :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b h1 h2 =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      ltIrrefl a (ltTrans a b a h1 h2)
+    end
+
+check ltAsymm
+
+def leOfLt :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (h : flt a b) -> fle F flt a b :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b h =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      fun h2 => ltAsymm F fadd fmul fsub fdiv fneg finv fzero fone flt A a b h h2
+    end
+
+check leOfLt
+
+def leOfEq :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (e : Eq F a b) -> fle F flt a b :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b e =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      fun h => ltIrrefl a
+        (subst0 F b a
+          (fun z => flt z a)
+          (sym0 F a b e)
+          h)
+    end
+
+check leOfEq
+
+def leRefl :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> fle F flt a a :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      fun h => ltIrrefl a h
+    end
+
+check leRefl
+
+def ltOfLtOfLe :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (c : F) -> (h1 : flt a b) -> (h2 : fle F flt b c) -> flt a c :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c h1 h2 =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      match ltTrichotomy b c with
+      | isLt h => ltTrans a b c h1 h
+      | isEq e => subst0 F b c (fun z => flt a z) e h1
+      | isGt h => exfalso (flt a c) (h2 h)
+      end
+    end
+
+check ltOfLtOfLe
+
+def addLtAddRight :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (c : F) -> (h : flt b c) -> flt (fadd b a) (fadd c a) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c h =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fadd a c)
+        (fadd c a)
+        (fun z => flt (fadd b a) z)
+        (addComm a c)
+        (subst0 F
+          (fadd a b)
+          (fadd b a)
+          (fun z => flt z (fadd a c))
+          (addComm a b)
+          (addLtAddLeft a b c h))
+    end
+
+check addLtAddRight
+
+def ltOfAddLtAddLeft :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (c : F) -> (h : flt (fadd a b) (fadd a c)) -> flt b c :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c h =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fadd (fneg a) (fadd a c))
+        c
+        (fun z => flt b z)
+        (trans0 F
+          (fadd (fneg a) (fadd a c))
+          (fadd (fadd (fneg a) a) c)
+          c
+          (sym0 F
+            (fadd (fadd (fneg a) a) c)
+            (fadd (fneg a) (fadd a c))
+            (addAssoc (fneg a) a c))
+        (trans0 F
+          (fadd (fadd (fneg a) a) c)
+          (fadd fzero c)
+          c
+          (cong0 F F
+            (fadd (fneg a) a)
+            fzero
+            (fun z => fadd z c)
+            (negAddCancel F fadd fmul fsub fdiv fneg finv fzero fone flt A a))
+          (zeroAdd F fadd fmul fsub fdiv fneg finv fzero fone flt A c)))
+        (subst0 F
+          (fadd (fneg a) (fadd a b))
+          b
+          (fun z => flt z (fadd (fneg a) (fadd a c)))
+          (trans0 F
+            (fadd (fneg a) (fadd a b))
+            (fadd (fadd (fneg a) a) b)
+            b
+            (sym0 F
+              (fadd (fadd (fneg a) a) b)
+              (fadd (fneg a) (fadd a b))
+              (addAssoc (fneg a) a b))
+          (trans0 F
+            (fadd (fadd (fneg a) a) b)
+            (fadd fzero b)
+            b
+            (cong0 F F
+              (fadd (fneg a) a)
+              fzero
+              (fun z => fadd z b)
+              (negAddCancel F fadd fmul fsub fdiv fneg finv fzero fone flt A a))
+            (zeroAdd F fadd fmul fsub fdiv fneg finv fzero fone flt A b)))
+          (addLtAddLeft (fneg a) (fadd a b) (fadd a c) h))
+    end
+
+check ltOfAddLtAddLeft
+
+def ltAddOfPosRight :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (hb : flt fzero b) -> flt a (fadd a b) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b hb =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fadd a fzero)
+        a
+        (fun z => flt z (fadd a b))
+        (addZero a)
+        (addLtAddLeft a fzero b hb)
+    end
+
+check ltAddOfPosRight
+
+def ltAddOfPosLeft :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (hb : flt fzero b) -> flt a (fadd b a) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b hb =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fadd a b)
+        (fadd b a)
+        (fun z => flt a z)
+        (addComm a b)
+        (ltAddOfPosRight F fadd fmul fsub fdiv fneg finv fzero fone flt A a b hb)
+    end
+
+check ltAddOfPosLeft
+
+def negNegOfPos :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (h : flt fzero a) -> flt (fneg a) fzero :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a h =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fadd (fneg a) a)
+        fzero
+        (fun z => flt (fneg a) z)
+        (negAddCancel F fadd fmul fsub fdiv fneg finv fzero fone flt A a)
+        (subst0 F
+          (fadd (fneg a) fzero)
+          (fneg a)
+          (fun z => flt z (fadd (fneg a) a))
+          (addZero (fneg a))
+          (addLtAddLeft (fneg a) fzero a h))
+    end
+
+check negNegOfPos
+
+def negPosOfNeg :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (h : flt a fzero) -> flt fzero (fneg a) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a h =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fadd (fneg a) fzero)
+        (fneg a)
+        (fun z => flt fzero z)
+        (addZero (fneg a))
+        (subst0 F
+          (fadd (fneg a) a)
+          fzero
+          (fun z => flt z (fadd (fneg a) fzero))
+          (negAddCancel F fadd fmul fsub fdiv fneg finv fzero fone flt A a)
+          (addLtAddLeft (fneg a) a fzero h))
+    end
+
+check negPosOfNeg
+
+def subPosOfLt :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (h : flt b a) -> flt fzero (fsub a b) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b h =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fadd a (fneg b))
+        (fsub a b)
+        (fun z => flt fzero z)
+        (sym0 F
+          (fsub a b)
+          (fadd a (fneg b))
+          (subEqAddNeg a b))
+        (subst0 F
+          (fadd b (fneg b))
+          fzero
+          (fun z => flt z (fadd a (fneg b)))
+          (addNegCancel b)
+          (addLtAddRight F fadd fmul fsub fdiv fneg finv fzero fone flt A (fneg b) b a h))
+    end
+
+check subPosOfLt
+
+def ltOfSubPos :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (h : flt fzero (fsub a b)) -> flt b a :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b h =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fadd b (fsub a b))
+        a
+        (fun z => flt b z)
+        (trans0 F
+          (fadd b (fsub a b))
+          (fadd b (fadd a (fneg b)))
+          a
+          (cong0 F F
+            (fsub a b)
+            (fadd a (fneg b))
+            (fun z => fadd b z)
+            (subEqAddNeg a b))
+        (trans0 F
+          (fadd b (fadd a (fneg b)))
+          (fadd b (fadd (fneg b) a))
+          a
+          (cong0 F F
+            (fadd a (fneg b))
+            (fadd (fneg b) a)
+            (fun z => fadd b z)
+            (addComm a (fneg b)))
+        (trans0 F
+          (fadd b (fadd (fneg b) a))
+          (fadd (fadd b (fneg b)) a)
+          a
+          (sym0 F
+            (fadd (fadd b (fneg b)) a)
+            (fadd b (fadd (fneg b) a))
+            (addAssoc b (fneg b) a))
+        (trans0 F
+          (fadd (fadd b (fneg b)) a)
+          (fadd fzero a)
+          a
+          (cong0 F F
+            (fadd b (fneg b))
+            fzero
+            (fun z => fadd z a)
+            (addNegCancel b))
+          (zeroAdd F fadd fmul fsub fdiv fneg finv fzero fone flt A a)))))
+        (subst0 F
+          (fadd b fzero)
+          b
+          (fun z => flt z (fadd b (fsub a b)))
+          (addZero b)
+          (addLtAddLeft b fzero (fsub a b) h))
+    end
+
+check ltOfSubPos
+
+def subLtSelf :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (h : flt fzero b) -> flt (fsub a b) a :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b h =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fadd a fzero)
+        a
+        (fun z => flt (fsub a b) z)
+        (addZero a)
+        (subst0 F
+          (fadd a (fneg b))
+          (fsub a b)
+          (fun z => flt z (fadd a fzero))
+          (sym0 F
+            (fsub a b)
+            (fadd a (fneg b))
+            (subEqAddNeg a b))
+          (addLtAddLeft a (fneg b) fzero
+            (negNegOfPos F fadd fmul fsub fdiv fneg finv fzero fone flt A b h)))
+    end
+
+check subLtSelf
+
+def leAddOfNonnegRight :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (hb : fle F flt fzero b) -> fle F flt a (fadd a b) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b hb =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      fun h2 =>
+        hb
+          (ltOfAddLtAddLeft F fadd fmul fsub fdiv fneg finv fzero fone flt A a b fzero
+            (subst0 F
+              a
+              (fadd a fzero)
+              (fun z => flt (fadd a b) z)
+              (sym0 F
+                (fadd a fzero)
+                a
+                (addZero a))
+              h2))
+    end
+
+check leAddOfNonnegRight
+
+def zeroLtOne :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  flt fzero fone :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      match ltTrichotomy fzero fone with
+      | isLt h => h
+      | isEq e => exfalso (flt fzero fone) (zeroNeOne e)
+      | isGt h =>
+        exfalso (flt fzero fone)
+          (ltAsymm F fadd fmul fsub fdiv fneg finv fzero fone flt A
+            fzero
+            fone
+            (subst0 F
+              (fmul (fneg fone) (fneg fone))
+              fone
+              (fun z => flt fzero z)
+              (trans0 F
+                (fmul (fneg fone) (fneg fone))
+                (fmul fone fone)
+                fone
+                (negMulNeg F fadd fmul fsub fdiv fneg finv fzero fone flt A fone fone)
+                (mulOne fone))
+              (mulPos
+                (fneg fone)
+                (fneg fone)
+                (negPosOfNeg F fadd fmul fsub fdiv fneg finv fzero fone flt A fone h)
+                (negPosOfNeg F fadd fmul fsub fdiv fneg finv fzero fone flt A fone h)))
+            h)
+      end
+    end
+
+check zeroLtOne
+
+def mulLtMulOfPosRight :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (c : F) -> (h : flt a b) -> (hc : flt fzero c) -> flt (fmul a c) (fmul b c) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c h hc =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      ltOfSubPos F fadd fmul fsub fdiv fneg finv fzero fone flt A
+        (fmul b c)
+        (fmul a c)
+        (subst0 F
+          (fmul (fsub b a) c)
+          (fsub (fmul b c) (fmul a c))
+          (fun z => flt fzero z)
+          (trans0 F
+            (fmul (fsub b a) c)
+            (fmul c (fsub b a))
+            (fsub (fmul b c) (fmul a c))
+            (mulComm (fsub b a) c)
+          (trans0 F
+            (fmul c (fsub b a))
+            (fsub (fmul c b) (fmul c a))
+            (fsub (fmul b c) (fmul a c))
+            (deriveMulSub F fadd fmul fsub fdiv fneg finv fzero fone flt A c b a)
+          (trans0 F
+            (fsub (fmul c b) (fmul c a))
+            (fsub (fmul b c) (fmul c a))
+            (fsub (fmul b c) (fmul a c))
+            (cong0 F F
+              (fmul c b)
+              (fmul b c)
+              (fun z => fsub z (fmul c a))
+              (mulComm c b))
+            (cong0 F F
+              (fmul c a)
+              (fmul a c)
+              (fun z => fsub (fmul b c) z)
+              (mulComm c a)))))
+          (mulPos
+            (fsub b a)
+            c
+            (subPosOfLt F fadd fmul fsub fdiv fneg finv fzero fone flt A b a h)
+            hc))
+    end
+
+check mulLtMulOfPosRight
+
+def mulLtMulOfPosLeft :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (c : F) -> (h : flt a b) -> (hc : flt fzero c) -> flt (fmul c a) (fmul c b) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c h hc =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fmul b c)
+        (fmul c b)
+        (fun z => flt (fmul c a) z)
+        (mulComm b c)
+        (subst0 F
+          (fmul a c)
+          (fmul c a)
+          (fun z => flt z (fmul b c))
+          (mulComm a c)
+          (mulLtMulOfPosRight F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c h hc))
+    end
+
+check mulLtMulOfPosLeft
+
+def mulLtOfLtOneRight :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (ha : flt fzero a) -> (hb : flt b fone) -> flt (fmul a b) a :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b ha hb =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fmul a fone)
+        a
+        (fun z => flt (fmul a b) z)
+        (mulOne a)
+        (mulLtMulOfPosLeft F fadd fmul fsub fdiv fneg finv fzero fone flt A b fone a hb ha)
+    end
+
+check mulLtOfLtOneRight
+
+def invPos :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (ha : flt fzero a) -> flt fzero (finv a) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a ha =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      match ltTrichotomy fzero (finv a) with
+      | isLt h => h
+      | isEq e =>
+        exfalso (flt fzero (finv a))
+          (zeroNeOne
+            (sym0 F fone fzero
+              (trans0 F
+                fone
+                (fmul a (finv a))
+                fzero
+                (sym0 F (fmul a (finv a)) fone
+                  (mulInvCancel a
+                    (deriveNeOfGt F fadd fmul fsub fdiv fneg finv fzero fone flt A a ha)))
+                (trans0 F
+                  (fmul a (finv a))
+                  (fmul a fzero)
+                  fzero
+                  (cong0 F F (finv a) fzero
+                    (fun z => fmul a z)
+                    (sym0 F fzero (finv a) e))
+                  (mulZero F fadd fmul fsub fdiv fneg finv fzero fone flt A a)))))
+      | isGt h =>
+        exfalso (flt fzero (finv a))
+          (ltAsymm F fadd fmul fsub fdiv fneg finv fzero fone flt A
+            fzero
+            fone
+            (zeroLtOne F fadd fmul fsub fdiv fneg finv fzero fone flt A)
+            (subst0 F
+              (fadd fone (fneg fone))
+              fzero
+              (fun z => flt fone z)
+              (addNegCancel fone)
+              (subst0 F
+                (fadd fone fzero)
+                fone
+                (fun z => flt z (fadd fone (fneg fone)))
+                (addZero fone)
+                (addLtAddLeft fone fzero (fneg fone)
+                  (subst0 F
+                    (fmul a (fneg (finv a)))
+                    (fneg fone)
+                    (fun z => flt fzero z)
+                    (trans0 F
+                      (fmul a (fneg (finv a)))
+                      (fneg (fmul a (finv a)))
+                      (fneg fone)
+                      (mulNeg F fadd fmul fsub fdiv fneg finv fzero fone flt A a (finv a))
+                      (cong0 F F (fmul a (finv a)) fone
+                        (fun z => fneg z)
+                        (mulInvCancel a
+                          (deriveNeOfGt F fadd fmul fsub fdiv fneg finv fzero fone flt A a ha))))
+                    (mulPos a (fneg (finv a)) ha
+                      (negPosOfNeg F fadd fmul fsub fdiv fneg finv fzero fone flt A (finv a) h)))))))
+      end
+    end
+
+check invPos
+
+def divPos :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (ha : flt fzero a) -> (hb : flt fzero b) -> flt fzero (fdiv a b) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b ha hb =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fmul a (finv b))
+        (fdiv a b)
+        (fun z => flt fzero z)
+        (sym0 F (fdiv a b) (fmul a (finv b)) (divEqMulInv a b))
+        (mulPos a (finv b) ha
+          (invPos F fadd fmul fsub fdiv fneg finv fzero fone flt A b hb))
+    end
+
+check divPos
+
+def divLtOfLtMul :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (c : F) -> (hc : flt fzero c) -> (h : flt a (fmul b c)) -> flt (fdiv a c) b :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c hc h =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fmul a (finv c))
+        (fdiv a c)
+        (fun z => flt z b)
+        (sym0 F (fdiv a c) (fmul a (finv c)) (divEqMulInv a c))
+        (subst0 F
+          (fmul (fmul b c) (finv c))
+          b
+          (fun z => flt (fmul a (finv c)) z)
+          (trans0 F
+            (fmul (fmul b c) (finv c))
+            (fmul b (fmul c (finv c)))
+            b
+            (mulAssoc b c (finv c))
+          (trans0 F
+            (fmul b (fmul c (finv c)))
+            (fmul b fone)
+            b
+            (cong0 F F
+              (fmul c (finv c))
+              fone
+              (fun z => fmul b z)
+              (mulInvCancel c
+                (deriveNeOfGt F fadd fmul fsub fdiv fneg finv fzero fone flt A c hc)))
+            (mulOne b)))
+          (mulLtMulOfPosRight F fadd fmul fsub fdiv fneg finv fzero fone flt A
+            a
+            (fmul b c)
+            (finv c)
+            h
+            (invPos F fadd fmul fsub fdiv fneg finv fzero fone flt A c hc)))
+    end
+
+check divLtOfLtMul
+
+def invLtInvOfLt :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (ha : flt fzero a) -> (h : flt a b) -> flt (finv b) (finv a) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b ha h =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fmul (fmul (finv b) a) (finv a))
+        (finv b)
+        (fun z => flt z (finv a))
+        (trans0 F
+          (fmul (fmul (finv b) a) (finv a))
+          (fmul (finv b) (fmul a (finv a)))
+          (finv b)
+          (mulAssoc (finv b) a (finv a))
+        (trans0 F
+          (fmul (finv b) (fmul a (finv a)))
+          (fmul (finv b) fone)
+          (finv b)
+          (cong0 F F
+            (fmul a (finv a))
+            fone
+            (fun z => fmul (finv b) z)
+            (mulInvCancel a
+              (deriveNeOfGt F fadd fmul fsub fdiv fneg finv fzero fone flt A a ha)))
+          (mulOne (finv b))))
+        (subst0 F
+          (fmul (fmul (finv b) b) (finv a))
+          (finv a)
+          (fun z => flt (fmul (fmul (finv b) a) (finv a)) z)
+          (trans0 F
+            (fmul (fmul (finv b) b) (finv a))
+            (fmul fone (finv a))
+            (finv a)
+            (cong0 F F
+              (fmul (finv b) b)
+              fone
+              (fun z => fmul z (finv a))
+              (trans0 F
+                (fmul (finv b) b)
+                (fmul b (finv b))
+                fone
+                (mulComm (finv b) b)
+                (mulInvCancel b
+                  (deriveNeOfGt F fadd fmul fsub fdiv fneg finv fzero fone flt A b
+                    (ltTrans fzero a b ha h)))))
+            (oneMul F fadd fmul fsub fdiv fneg finv fzero fone flt A (finv a)))
+          (mulLtMulOfPosRight F fadd fmul fsub fdiv fneg finv fzero fone flt A
+            (fmul (finv b) a)
+            (fmul (finv b) b)
+            (finv a)
+            (mulLtMulOfPosLeft F fadd fmul fsub fdiv fneg finv fzero fone flt A
+              a
+              b
+              (finv b)
+              h
+              (invPos F fadd fmul fsub fdiv fneg finv fzero fone flt A b
+                (ltTrans fzero a b ha h)))
+            (invPos F fadd fmul fsub fdiv fneg finv fzero fone flt A a ha)))
+    end
+
+check invLtInvOfLt
+
+def divLtDivOfPosLeft :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (c : F) -> (ha : flt fzero a) -> (hc : flt fzero c) -> (h : flt c b) ->
+  flt (fdiv a b) (fdiv a c) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c ha hc h =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fmul a (finv b))
+        (fdiv a b)
+        (fun z => flt z (fdiv a c))
+        (sym0 F (fdiv a b) (fmul a (finv b)) (divEqMulInv a b))
+        (subst0 F
+          (fmul a (finv c))
+          (fdiv a c)
+          (fun z => flt (fmul a (finv b)) z)
+          (sym0 F (fdiv a c) (fmul a (finv c)) (divEqMulInv a c))
+          (mulLtMulOfPosLeft F fadd fmul fsub fdiv fneg finv fzero fone flt A
+            (finv b)
+            (finv c)
+            a
+            (invLtInvOfLt F fadd fmul fsub fdiv fneg finv fzero fone flt A c b hc h)
+            ha))
+    end
+
+check divLtDivOfPosLeft

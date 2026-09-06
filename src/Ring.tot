@@ -18,7 +18,7 @@ def zeroAdd :
   (a : F) -> Eq F (fadd fzero a) a :=
   fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a =>
     match A with
-    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
       trans0 F
         (fadd fzero a)
         (fadd a fzero)
@@ -35,7 +35,7 @@ def negAddCancel :
   (a : F) -> Eq F (fadd (fneg a) a) fzero :=
   fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a =>
     match A with
-    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
       trans0 F
         (fadd (fneg a) a)
         (fadd a (fneg a))
@@ -52,7 +52,7 @@ def addLeftCancel :
   (a : F) -> (b : F) -> (c : F) -> (0 h : Eq F (fadd a b) (fadd a c)) -> Eq F b c :=
   fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c h =>
     match A with
-    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
       trans0 F
         b
         (fadd fzero b)
@@ -109,7 +109,7 @@ def mulZero :
   (a : F) -> Eq F (fmul a fzero) fzero :=
   fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a =>
     match A with
-    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
       addLeftCancel F fadd fmul fsub fdiv fneg finv fzero fone flt A
         (fmul a fzero)
         (fmul a fzero)
@@ -145,7 +145,7 @@ def negEqOfAddEqZero :
   (a : F) -> (b : F) -> (0 h : Eq F (fadd a b) fzero) -> Eq F b (fneg a) :=
   fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b h =>
     match A with
-    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
       sym0 F (fneg a) b
         (trans0 F
           (fneg a)
@@ -189,7 +189,7 @@ def mulNeg :
   (a : F) -> (c : F) -> Eq F (fmul a (fneg c)) (fneg (fmul a c)) :=
   fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a c =>
     match A with
-    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
       negEqOfAddEqZero F fadd fmul fsub fdiv fneg finv fzero fone flt A
         (fmul a c)
         (fmul a (fneg c))

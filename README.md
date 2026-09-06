@@ -6,7 +6,7 @@ fee. The port is verification only. It measures the cost of the same
 proof in tot, a language with no fields, no division, no tactics and no
 rewrite form. The theorem is proved twice: once against a record of the
 eight field laws that the Lean proof cites, and once against a record of
-fourteen ordered-field axioms, from which the eight laws are derived.
+seventeen ordered-field axioms, from which the eight laws are derived.
 
 ## Check
 
@@ -18,7 +18,7 @@ Run from this directory. The runner uses the checker named by `TOT` when
 that variable is set. Otherwise it uses the pinned checker at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe` and
 stops with a message when that file is absent. The runner concatenates
-the seven source files, in the order of the Sources line at the end of
+the nine source files, in the order of the Sources line at the end of
 this file, in temporary files and checks with `--no-prelude --no-axioms`. It prints the checker
 SHA-256, so validation identifies the binary actually used. No compiler
 rebuild is necessary when a built checker exists.
@@ -68,11 +68,11 @@ equality chain.
 `neOfGt` states the disequality as a function to `Empty`, because tot has
 no `Ne` and no `Prop`.
 
-### The same identity from fourteen axioms
+### The same identity from seventeen axioms
 
 `swapOutputIdentityOf` in `src/Compose.tot` states the same identity
 against the record `OrderedField` of `src/Axioms.tot`. That record holds
-fourteen axioms of an ordered field as w fields, in the same style as
+seventeen axioms of an ordered field as w fields, in the same style as
 `FieldLaws`. `src/Ring.tot` proves six helper lemmas from the axioms.
 `src/Laws.tot` proves each of the eight laws and builds the `FieldLaws`
 record once, in the def `fieldLawsOf`. `src/Compose.tot` applies
@@ -96,6 +96,9 @@ the relation, the axiom record, three elements and two positivity proofs.
 | `ltIrrefl` | `flt a a` gives `Empty` | `lt_irrefl` |
 | `ltTrans` | `flt a b` and `flt b c` give `flt a c` | `lt_trans` |
 | `addLtAddLeft` | `flt b c` gives `flt (fadd a b) (fadd a c)` | `add_lt_add_left` |
+| `mulPos` | `flt fzero a` and `flt fzero b` give `flt fzero (fmul a b)` | `mul_pos` |
+| `ltTrichotomy` | `flt a b`, `Eq F a b` or `flt b a` holds | `lt_trichotomy` |
+| `zeroNeOne` | `Eq F fzero fone` gives `Empty` | `zero_ne_one` |
 
 The disequality of `mulInvCancel` is a function from the equality to
 `Empty`, as in `neOfGt`. The operations `fneg` and `finv` and the
@@ -134,6 +137,98 @@ of an axiom with one `subst0` transport, so they chain no equality.
 Each Lean lemma is one Mathlib theorem whose proof instance resolution
 supplies. The tot version writes the proof from the axioms.
 
+## The order and fraction library
+
+The thirty structural theorems of amm-lean that this port does not cover
+yet cite about thirty Mathlib order and fraction lemmas, among them
+`mul_pos`, `sub_pos`, `div_lt_iff₀`, `div_pos`, `div_div` and
+`div_eq_div_iff`. None of them follows from the axioms as M2 left the
+record, because that record had no multiplication-order axiom, no
+totality and no `zero_ne_one`. The record now holds seventeen
+axioms, and two files derive every cited lemma from them. The comment in
+`src/Compose.tot` still says fourteen axioms, because M3a does not
+change that file.
+
+`src/Frac.tot` holds the twelve `Eq` lemmas of the fraction library. It
+cites `src/Axioms.tot` and `src/Ring.tot`, and it cites nothing in
+`src/Order.tot`. `src/Order.tot` holds `exfalso`, `fle` and the
+twenty-four order lemmas. Every def of both files takes the eleven
+parameters of the defs of `src/Ring.tot`, then its own arguments, and
+destructures the record `A` with one match. Every new proof binder
+carries quantity w, so that a later milestone can store such a proof in
+a record field, and a w value passes into any 0 slot. Three binders of
+these two files stay at quantity 0, and the checker forces each one. The
+first is the binder inside `fle`, because the `not_lt` form erases it.
+The second is the second hypothesis of `ltAsymm`, because `leOfLt` gives
+that erased binder to it. The third is the nonzero hypothesis of a
+denominator, which stays at quantity 0 when the body only forwards it
+into a 0 slot, and which carries w when the body applies it or gives it
+to a w slot.
+
+Two conventions hold in both files. First, `fle F flt a b` is the
+`not_lt` form of `a <= b`. It is the type of a function from a proof of
+`flt b a` to `Empty`. tot has no `Prop` and no order class, so the
+library states `<=` in this way, and `exfalso` eliminates `Empty` into
+any type. `fle` and `exfalso` are reducible defs, because a plain def is
+opaque to conversion and the statements read their unfoldings. Second,
+every fraction lemma takes one nonzero hypothesis for each denominator,
+because `inv_zero` is not an axiom of `src/Axioms.tot`, so nothing here
+fixes the value of `finv fzero`. M3b discharges the `div_nonneg`
+obligations of `addLiquidity` with `divPos` and `leOfLt`.
+
+The `rewrites` column counts the `trans0` applications of the def plus
+one, so it is the number of equalities that the def chains. A def whose
+body is a plain term, or one application with `subst0` transports,
+chains no equality and counts 0. A line that holds two `trans0` counts
+twice. The `lines` column counts from the `def` line to the `check`
+line.
+
+| tot name | Mathlib name | file | lines | rewrites |
+| --- | --- | --- | --- | --- |
+| `negNeg` | `neg_neg` | `src/Frac.tot` | 15 | 0 |
+| `zeroMul` | `zero_mul` | `src/Frac.tot` | 18 | 2 |
+| `negMulNeg` | `neg_mul_neg` | `src/Frac.tot` | 41 | 5 |
+| `oneMul` | `one_mul` | `src/Frac.tot` | 18 | 2 |
+| `invEqOfMulEqOne` | `inv_eq_of_mul_eq_one_right` | `src/Frac.tot` | 53 | 6 |
+| `mulNeZero` | `mul_ne_zero` | `src/Frac.tot` | 60 | 7 |
+| `mulInv` | `mul_inv` | `src/Frac.tot` | 81 | 7 |
+| `divMulCancel` | `div_mul_cancel₀` | `src/Frac.tot` | 33 | 5 |
+| `mulDivCancelRight` | `mul_div_cancel_right₀` | `src/Frac.tot` | 28 | 4 |
+| `divDiv` | `div_div` | `src/Frac.tot` | 36 | 5 |
+| `mulDivMulRight` | `mul_div_mul_right` | `src/Frac.tot` | 41 | 8 |
+| `divEqDivOfMulEq` | `div_eq_div_iff` | `src/Frac.tot` | 82 | 14 |
+| `ltAsymm` | `lt_asymm` | `src/Order.tot` | 13 | 0 |
+| `leOfLt` | `le_of_lt` | `src/Order.tot` | 13 | 0 |
+| `leOfEq` | `le_of_eq` | `src/Order.tot` | 17 | 0 |
+| `leRefl` | `le_refl` | `src/Order.tot` | 13 | 0 |
+| `ltOfLtOfLe` | `lt_of_lt_of_le` | `src/Order.tot` | 17 | 0 |
+| `addLtAddRight` | `add_lt_add_right` | `src/Order.tot` | 23 | 0 |
+| `ltOfAddLtAddLeft` | `lt_of_add_lt_add_left` | `src/Order.tot` | 57 | 5 |
+| `ltAddOfPosRight` | `lt_add_of_pos_right` | `src/Order.tot` | 18 | 0 |
+| `ltAddOfPosLeft` | `lt_add_of_pos_left` | `src/Order.tot` | 18 | 0 |
+| `negNegOfPos` | `neg_neg_of_pos` | `src/Order.tot` | 23 | 0 |
+| `negPosOfNeg` | `neg_pos` | `src/Order.tot` | 23 | 0 |
+| `subPosOfLt` | `sub_pos` | `src/Order.tot` | 26 | 0 |
+| `ltOfSubPos` | `sub_pos` | `src/Order.tot` | 58 | 5 |
+| `subLtSelf` | `sub_lt_self` | `src/Order.tot` | 27 | 0 |
+| `leAddOfNonnegRight` | `le_add_of_nonneg_right` | `src/Order.tot` | 24 | 0 |
+| `zeroLtOne` | `zero_lt_one` | `src/Order.tot` | 37 | 2 |
+| `mulLtMulOfPosRight` | `mul_lt_mul_of_pos_right` | `src/Order.tot` | 48 | 4 |
+| `mulLtMulOfPosLeft` | `mul_lt_mul_of_pos_left` | `src/Order.tot` | 23 | 0 |
+| `mulLtOfLtOneRight` | `mul_lt_of_lt_one_right` | `src/Order.tot` | 18 | 0 |
+| `invPos` | `inv_pos` | `src/Order.tot` | 66 | 4 |
+| `divPos` | `div_pos` | `src/Order.tot` | 19 | 0 |
+| `divLtOfLtMul` | `div_lt_iff₀` | `src/Order.tot` | 43 | 3 |
+| `invLtInvOfLt` | `inv_lt_inv_of_lt` | `src/Order.tot` | 65 | 5 |
+| `divLtDivOfPosLeft` | `div_lt_div_of_pos_left` | `src/Order.tot` | 29 | 0 |
+
+`subPosOfLt` and `ltOfSubPos` are the two directions of `sub_pos`.
+`ltAsymm`, `leOfLt`, `leRefl` and `ltOfLtOfLe` give the order interface
+that the structural theorems read. `zeroLtOne` needs all three new
+axioms: it takes the trichotomy of `fzero` and `fone`, it refutes the
+equality with `zeroNeOne`, and it refutes `flt fone fzero` with
+`mulPos` on `fneg fone` and `negMulNeg`.
+
 ## Measurement
 
 | Quantity | Lean | tot, pilot | tot, record |
@@ -170,23 +265,26 @@ excluded from the counts.
 
 | file | lines | `trans0` | `cong0` | `sym0` | `subst0` |
 | --- | --- | --- | --- | --- | --- |
-| `src/Axioms.tot` | 36 | 0 | 0 | 0 | 0 |
+| `src/Axioms.tot` | 50 | 0 | 0 | 0 | 0 |
 | `src/Ring.tot` | 221 | 16 | 7 | 10 | 0 |
 | `src/Laws.tot` | 300 | 15 | 8 | 3 | 2 |
 | `src/Compose.tot` | 19 | 0 | 0 | 0 | 0 |
-| total | 576 | 31 | 15 | 13 | 2 |
+| `src/Frac.tot` | 534 | 54 | 35 | 20 | 0 |
+| `src/Order.tot` | 763 | 21 | 12 | 14 | 34 |
+| total | 1887 | 106 | 62 | 47 | 36 |
 
-The library costs 576 lines once, for fourteen axioms, six helpers, the
-eight laws and the composed theorem. The Lean side costs nothing here,
+The library costs 1887 lines once, for seventeen axioms, six helpers,
+the eight laws, the composed theorem and the thirty-six lemmas of the
+order and fraction library. The Lean side costs nothing here,
 because Mathlib supplies the same lemmas. The composed theorem has
 sixteen hypotheses in the signature and one application in the body.
 
-`test/check.py` runs in about 0.4 seconds of wall time on the pinned
-checker, for all thirty-one cases.
+`test/check.py` runs in about 0.8 seconds of wall time on the pinned
+checker, for all thirty-eight cases.
 
 ## Scope and trust
 
-The eight laws are theorems of `src/Laws.tot`, proved from the fourteen
+The eight laws are theorems of `src/Laws.tot`, proved from the seventeen
 axioms of `OrderedField`. Those axioms are hypotheses, not tot axioms.
 The records `FieldLaws` and `OrderedField` are hypotheses of the same
 kind: this repository supplies no inhabitant of either one. No file
@@ -205,11 +303,14 @@ tot's current elaborator and kernel. This project does not establish
 their metatheoretic soundness.
 
 The port covers one theorem, in two forms. The other thirty theorems of
-amm-lean are not ported.
+amm-lean are not ported. The order and fraction library holds thirty-six
+lemmas that those theorems cite. It declares no axiom of its own: every
+lemma is a def with a proof term, and the only new hypotheses are the
+three fields that the record gained.
 
 ## Validation
 
-On 2026-09-06, all thirty-one checks passed with checker SHA-256
+On 2026-09-06, all thirty-eight checks passed with checker SHA-256
 `30c4524d57f6723e39ba117097222f3ab8ef3e899a8a4af8b7e60c68337842bf` at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe`,
 built from tot commit `8cf0b8b` with a clean tree. Build that commit to
@@ -218,7 +319,7 @@ reproduce the reference checker.
 The checker reports every rejection in this repository with the word
 `mismatch`, except the axiom case, which reports `axiom`.
 
-The thirty-one checks:
+The thirty-eight checks:
 
 - The theorem checks without a prelude or axioms.
 - The proof is rejected against a commuted right side, `fmul y x`.
@@ -236,16 +337,32 @@ The thirty-one checks:
 - One check replaces the result of the `lawMulComm` arm by
   `mulComm b a`. The projection then contradicts its own return type,
   and the checker rejects it.
-- Fourteen checks, one for each axiom. Each check weakens that one axiom
+- Seventeen checks, one for each axiom. Each check weakens that one axiom
   to a reflexive or trivial statement and leaves every proof unchanged.
   The first def that uses the axiom is rejected. Every axiom is load
-  bearing.
+  bearing. The three axioms of M3a fail at the defs that read them
+  first: `mulPos` at `zeroLtOne`, `ltTrichotomy` at `ltOfLtOfLe` and
+  `zeroNeOne` at `zeroLtOne`.
 - One check replaces the body of `deriveMulComm` by `mulComm b a`. The
   def then contradicts its own return type.
 - One check exchanges the `deriveAddMul` and `deriveMulComm` arguments
   of `fieldLawsOf`. The constructor then receives a law of the wrong
   type.
 - A user axiom is rejected.
+- Four checks, one for each of four lemmas of the library. Each check
+  changes the result type of one def and keeps its proof, so the proof
+  proves the original statement and the checker reports the mismatch at
+  that def. `subPosOfLt` states `flt fzero (fsub b a)`, `divDiv` states
+  `fdiv a (fmul c b)`, `invPos` states `flt (finv a) fzero`, and
+  `divLtDivOfPosLeft` states `flt (fdiv a c) (fdiv a b)`. Each one is
+  rejected at its own def.
+
+For the seven checks that M3a adds, the runner also reads the position
+of the diagnostic and confirms the name of the first failing def. A
+mutation that moves the rejection to another def fails the case. Each
+mutation helper asserts the exact number of occurrences of its anchor,
+so a rename in a source file stops the runner instead of weakening a
+case.
 
 The negative controls show that specific proof terms are rejected. They
 do not show that the false statements are unprovable.
@@ -262,8 +379,9 @@ above.
 
 ## Probe results
 
-Five facts about tot records, found with scratch files during the record
-milestone. The scratch files are not part of this repository.
+Ten facts about tot, found with scratch files. The first five come from
+the record milestone and the last five come from the M3a probes. The
+scratch files are not part of this repository.
 
 - A data record that bundles the eight field laws checks when the law
   fields carry quantity w. When the fields carry quantity 0 and a def
@@ -285,17 +403,42 @@ milestone. The scratch files are not part of this repository.
 - The carrier type may live inside the record when the record is
   declared at `Type 1` and the carrier field keeps quantity w. The
   checker accepted this form on the first attempt.
+- A plain def is opaque to conversion. `Eq F (sq a) (fmul a a)` is
+  rejected for a plain `def sq` and accepted for a `reducible def sq`.
+  Every def whose unfolding a later statement reads must be a reducible
+  def. In this repository that concerns `exfalso` and `fle` only.
+- A data type with two or three constructors, and a match with one arm
+  for each constructor, check. A constructor payload at quantity w binds
+  at quantity w in the arm, so an arm may return the payload.
+- `Empty` is eliminated by an arm-less match with a return motive,
+  `match e as x return A with end`. The binder may carry quantity 0.
+- A reducible def may return `Type 0` and serve as the type of a binder.
+  `fle` is such a def, and `fle F flt a b` is the type of a hypothesis
+  and the result type of a def.
+- A dependent proof field of a record projects through
+  `match p as q return P q`, when the projection is a reducible def and
+  the field carries quantity w. A plain def is rejected, because the
+  declared return type does not reduce against the field variables that
+  the match binds.
 
 ## Next milestones
 
-1. Port the other thirty theorems of amm-lean. They are structural: each
-   one reads the `Pool`, `FeeRate` and `swap` definitions of
-   `AmmLean/Basic.lean`. Those definitions come first, as tot data and
-   defs over the axiom record. Measure whether the per-theorem overhead
-   falls once the record and the derivation library exist.
-2. Supply a concrete carrier: an inhabitant of `OrderedField` for one
+1. M3b: `Pool` and `FeeRate` as data records with w proof fields and
+   reducible projections, the fifteen definitions of `AmmLean/Basic.lean`
+   as reducible defs, the eight theorems of that file, and the eleven
+   positivity obligations of `swap`, `swapWithFee`, `addLiquidity` and
+   `removeLiquidity`.
+2. M3c: the four theorems of `AmmLean/Invariant.lean` and the six
+   theorems of `AmmLean/NoDrain.lean`.
+3. M3d: the five theorems of `AmmLean/PriceImpact.lean` and the seven
+   theorems of `AmmLean/Liquidity.lean`. M3b, M3c and M3d together port
+   the other thirty theorems of amm-lean. Measure whether the
+   per-theorem overhead falls once the record, the derivation library
+   and the order and fraction library exist.
+4. Supply a concrete carrier: an inhabitant of `OrderedField` for one
    type, so that both theorems have a closed instance. tot has no
    rationals, so the carrier is a milestone of its own.
 
 Sources: `src/Foundation.tot`, `src/Field.tot`, `src/Invariant.tot`,
-`src/Axioms.tot`, `src/Ring.tot`, `src/Laws.tot`, `src/Compose.tot`.
+`src/Axioms.tot`, `src/Ring.tot`, `src/Laws.tot`, `src/Compose.tot`,
+`src/Frac.tot`, `src/Order.tot`.

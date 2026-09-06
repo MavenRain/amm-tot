@@ -22,7 +22,7 @@ def deriveAddPos :
   (a : F) -> (b : F) -> (0 ha : flt fzero a) -> (0 hb : flt fzero b) -> flt fzero (fadd a b) :=
   fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b ha hb =>
     match A with
-    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
       ltTrans fzero a (fadd a b) ha
         (subst0 F (fadd a fzero) a
           (fun z => flt z (fadd a b))
@@ -45,7 +45,7 @@ def deriveNeOfGt :
   (a : F) -> (0 h : flt fzero a) -> (0 e : Eq F a fzero) -> Empty :=
   fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a h e =>
     match A with
-    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
       ltIrrefl fzero (subst0 F a fzero (fun z => flt fzero z) e h)
     end
 
@@ -64,7 +64,7 @@ def deriveMulSub :
   (a : F) -> (b : F) -> (c : F) -> Eq F (fmul a (fsub b c)) (fsub (fmul a b) (fmul a c)) :=
   fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c =>
     match A with
-    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
       trans0 F
         (fmul a (fsub b c))
         (fmul a (fadd b (fneg c)))
@@ -110,7 +110,7 @@ def deriveMulDivAssoc :
   (a : F) -> (b : F) -> (c : F) -> Eq F (fmul a (fdiv b c)) (fdiv (fmul a b) c) :=
   fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c =>
     match A with
-    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
       trans0 F
         (fmul a (fdiv b c))
         (fmul a (fmul b (finv c)))
@@ -152,7 +152,7 @@ def deriveMulDivCancelLeft :
   (a : F) -> (b : F) -> (0 hne : (0 e : Eq F a fzero) -> Empty) -> Eq F (fdiv (fmul a b) a) b :=
   fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b hne =>
     match A with
-    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
       trans0 F
         (fdiv (fmul a b) a)
         (fmul (fmul a b) (finv a))
@@ -197,7 +197,7 @@ def deriveAddMul :
   (a : F) -> (b : F) -> (c : F) -> Eq F (fmul (fadd a b) c) (fadd (fmul a c) (fmul b c)) :=
   fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c =>
     match A with
-    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
       trans0 F
         (fmul (fadd a b) c)
         (fmul c (fadd a b))
@@ -238,7 +238,7 @@ def deriveMulComm :
   (a : F) -> (b : F) -> Eq F (fmul a b) (fmul b a) :=
   fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b =>
     match A with
-    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
       mulComm a b
     end
 
@@ -246,7 +246,7 @@ check deriveMulComm
 
 -- deriveAddSubCancelRight, the tot theorem for FieldLaws field
 -- addSubCancelRight: (a - b) + b = a, port of Mathlib add_sub_cancel_right,
--- derived from the fourteen axioms of src/Axioms.tot.
+-- derived from the seventeen axioms of src/Axioms.tot.
 def deriveAddSubCancelRight :
   (0 F : Type 0) ->
   (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
@@ -255,7 +255,7 @@ def deriveAddSubCancelRight :
   (a : F) -> (b : F) -> Eq F (fsub (fadd a b) b) a :=
   fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b =>
     match A with
-    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
       trans0 F
         (fsub (fadd a b) b)
         (fadd (fadd a b) (fneg b))
