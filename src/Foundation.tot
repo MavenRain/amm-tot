@@ -1,0 +1,38 @@
+-- Standalone logical foundation; no ambient tot prelude or axioms.
+-- Empty, Eq, subst0, J0, sym0, trans0 and cong0 are copied verbatim from
+-- the tot prelude (stdlib/prelude.tot lines 54-94 at commit 8cf0b8b).
+data Empty : Type 0 :=
+data Eq (0 A : Type 0) (0 a : A) : (0 b : A) -> Type 0 := | refl : Eq A a a
+
+reducible def subst0 : (0 A : Type 0) -> (0 a : A) -> (0 b : A) ->
+    (0 P : A -> Type 0) -> (0 h : Eq A a b) -> P a -> P b :=
+  fun A a b P h px => match h as x in Eq y return P y with | refl => px end
+
+reducible def J0 : (0 A : Type 0) -> (0 a : A) ->
+    (0 P : (y : A) -> Eq A a y -> Type 0) ->
+    P a (refl A a) -> (0 b : A) -> (0 h : Eq A a b) -> P b h :=
+  fun A a P pr b h => match h as x in Eq y return P y x with | refl => pr end
+
+reducible def sym0 : (0 A : Type 0) -> (0 a : A) -> (0 b : A) ->
+    (0 h : Eq A a b) -> Eq A b a :=
+  fun A a b h => subst0 A a b (fun z => Eq _ z a) h (refl A a)
+
+-- TRAP, do NOT "simplify" this to subst0 A b c (fun z => Eq A a z) h2 h1.
+-- A def body checks at quantity mode w, and subst0's last argument sits
+-- at a w position, so forwarding the 0-bound proof h1 there is
+-- Erased_use.  The nested double match eliminates h1 INSIDE h2's refl
+-- branch and returns a freshly built refl instead of forwarding a
+-- binder.
+reducible def trans0 : (0 A : Type 0) -> (0 a : A) -> (0 b : A) -> (0 c : A) ->
+    (0 h1 : Eq A a b) -> (0 h2 : Eq A b c) -> Eq A a c :=
+  fun A a b c h1 h2 =>
+    match h2 as x2 in Eq y2 return Eq A a y2 with
+    | refl =>
+        match h1 as x1 in Eq y1 return Eq A a y1 with
+        | refl => refl A a
+        end
+    end
+
+reducible def cong0 : (0 A : Type 0) -> (0 B : Type 0) -> (0 a : A) -> (0 b : A) ->
+    (0 f : A -> B) -> (0 h : Eq A a b) -> Eq B (f a) (f b) :=
+  fun A B a b f h => subst0 A a b (fun z => Eq B (f a) (f z)) h (refl B (f a))
