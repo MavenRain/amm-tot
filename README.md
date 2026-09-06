@@ -24,7 +24,7 @@ Run from this directory. The runner uses the checker named by `TOT` when
 that variable is set. Otherwise it uses the pinned checker at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe` and
 stops with a message when that file is absent. The runner concatenates
-the fifteen source files of `src`, in the order in which the Sources line
+the sixteen source files of `src`, in the order in which the Sources line
 at the end of
 this file names them, in temporary files and checks with `--no-prelude --no-axioms`. It prints the checker
 SHA-256, so validation identifies the binary actually used. No compiler
@@ -462,6 +462,64 @@ a shorter alternative, the one call
 `divPos PARAMS out dx (swapOutputPos PARAMS p dx hdx) hdx`, which the
 port does not use.
 
+## The natural numbers
+
+`src/Nat.tot` is the first slice of milestone M4, the concrete carrier.
+Every ordered field is infinite, because `fzero`, `fone`,
+`fadd fone fone` and their successors are all different by `zeroNeOne`
+and the order axioms. No finite type can therefore inhabit
+`OrderedField`, and the smallest carrier that this repository can build
+is the rationals. The rationals stand on the integers, and the integers
+stand on the naturals, so the carrier milestone starts with the natural
+numbers.
+
+The file holds three data types, 34 defs and nineteen theorems. The
+three data types are `Nat`, the witness record `NatLt` and `Dec`. The
+computing defs are `add`, `mul` and `sub`, which are reducible defs with
+recursion on the first argument, and `one`, `pred`, `natFamZero` and
+`natLt`, which are reducible defs. Every other def is a proof. The
+nineteen theorems are the two constructor lemmas `succInj` and
+`zeroNotSucc`, the seven semiring laws `addZero`, `addComm`, `addAssoc`,
+`mulComm`, `mulAssoc`, `mulOne` and `mulAdd` in the `OrderedField` field
+shapes, the cancellation law `addCancelLeft`, the five order laws
+`ltIrrefl`, `ltTrans`, `addLtAddLeft`, `mulPos` and `ltTrichotomy`, the
+separation law `zeroNeOne`, the two subtraction laws `subAdd` and
+`natLtOfAddLtAddLeft`, and the decision procedure `natDecEq`. The
+remaining defs are the helpers that the theorems cite: `addSuccRight`,
+`addLeftComm`, `mulZeroRight`, `mulSuccRight`, `addMulRight`,
+`succLtSucc`, `subZeroRight` and `subAddCancelLeft`.
+
+The order is the witness record `NatLt`. The proposition `m < n` holds
+when one `k` has `add m (succ k) = n`, so a proof of `natLt m n` is a
+pair of the difference `k` and that equation. `ltIrrefl`, `ltTrans`,
+`addLtAddLeft`, `mulPos`, `subAdd` and `natLtOfAddLtAddLeft` are then
+equational: each one reads the difference off its hypothesis and closes
+with `trans0`, `cong0` and `sym0`, and none of them recurses. M4b also
+reads the difference off the witness, which is what the integers need.
+
+The inductive relation `ltZero` and `ltSucc` was probed and it checks
+too, but it costs more. Its `ltIrrefl` fails the structural termination
+guard when it transports the hypothesis into the recursive call, so it
+needs a generalized statement and a second def. Its `ltTrans` cannot
+recurse on the second hypothesis, so it needs two inversion helpers and
+one `exfalso`. Every elimination of the indexed family also needs a
+motive that binds one name per index. The witness record needs none of
+that, because `NatLt` carries parameters and no index. The witness
+record is therefore the prescribed form.
+
+`natLt` is a reducible def over `NatLt`, and not the data type former
+itself, because `Trichotomy` takes its relation at quantity w while a
+data type former carries its parameters at quantity 0. Conversion joins
+`natLt m n` and `NatLt m n` by the delta step, so `ltWitness m n k e`
+inhabits `natLt m n` with no wrapper.
+
+M4a adds no axiom. The seventeen axioms of `OrderedField` are unchanged,
+and `src/Nat.tot` names none of them, because it is a closed development
+on one carrier and takes no parameters. It cites six declarations of the
+fifteen files that stand before it: `Empty`, `Eq`, `subst0`, `sym0`,
+`trans0` and `cong0` of `src/Foundation.tot`, and the `Trichotomy`
+declaration of `src/Axioms.tot`. It cites nothing else of them.
+
 ## Measurement
 
 | Quantity | Lean | tot, pilot | tot, record |
@@ -648,8 +706,66 @@ are one in each of `addLiquidityPreservesRatio`, `lpShareCross`,
 context. The five `subst0` are two in `addLiquidityPreservesRatio`, two
 in `lpShareCross` and one in `addRemoveRoundtripX`.
 
-`test/check.py` runs in about 4.0 seconds of wall time on the pinned
-checker, for all ninety-seven cases.
+The one file of M4a, in proof-term occurrences. Comment lines are
+excluded from the counts, as in the tables above.
+
+| file | Lean | lines | `trans0` | `cong0` | `sym0` | `subst0` |
+| --- | --- | --- | --- | --- | --- | --- |
+| `src/Nat.tot` | Lean core and Mathlib | 299 | 20 | 23 | 12 | 1 |
+
+The file is 318 lines with its nineteen-line header comment, and 299
+lines without it. The Lean column names the library that supplies the
+same declarations: `Nat` and its lemmas come from Lean core and
+Mathlib, so the Lean side of M4a costs no source file of its own. The
+one `subst0` is the transport of `zeroNotSucc` over `natFamZero`. The
+twenty `trans0`, the 23 `cong0` and the twelve `sym0` are the steps of
+the semiring laws, the order laws and the two subtraction laws, which
+chain equations by hand, because tot has no rewrite form.
+
+The Lean source of each def of `src/Nat.tot`, in file order.
+
+| def | Lean source |
+| --- | --- |
+| `pred` | no source |
+| `natFamZero` | no source |
+| `succInj` | Lean core `Nat.succ.inj` |
+| `zeroNotSucc` | Lean core `Nat.noConfusion` |
+| `addZero` | Mathlib `Nat.add_zero` |
+| `addSuccRight` | Mathlib `Nat.add_succ` |
+| `addComm` | Mathlib `Nat.add_comm` |
+| `addAssoc` | Mathlib `Nat.add_assoc` |
+| `addLeftComm` | Mathlib `Nat.add_left_comm` |
+| `addCancelLeft` | Mathlib `Nat.add_left_cancel` |
+| `mulZeroRight` | Mathlib `Nat.mul_zero` |
+| `mulSuccRight` | Mathlib `Nat.mul_succ` |
+| `mulComm` | Mathlib `Nat.mul_comm` |
+| `addMulRight` | Mathlib `Nat.add_mul` |
+| `mulAssoc` | Mathlib `Nat.mul_assoc` |
+| `mulOne` | Mathlib `Nat.mul_one` |
+| `mulAdd` | Mathlib `Nat.mul_add` |
+| `natLt` | no source |
+| `ltIrrefl` | Mathlib `lt_irrefl` |
+| `ltTrans` | Mathlib `lt_trans` |
+| `addLtAddLeft` | Mathlib `Nat.add_lt_add_left` |
+| `mulPos` | Mathlib `Nat.mul_pos` |
+| `succLtSucc` | Mathlib `Nat.succ_lt_succ` |
+| `ltTrichotomy` | Mathlib `Nat.lt_trichotomy` |
+| `zeroNeOne` | Mathlib `zero_ne_one` |
+| `sub` | Mathlib `Nat.sub` |
+| `subZeroRight` | Mathlib `Nat.sub_zero` |
+| `subAddCancelLeft` | Mathlib `Nat.add_sub_cancel_left` |
+| `subAdd` | Mathlib `Nat.add_sub_cancel'` |
+| `natLtOfAddLtAddLeft` | Mathlib `Nat.lt_of_add_lt_add_left` |
+| `natDecEq` | Lean core `Nat.decEq` |
+
+`natFamZero`, `pred` and `natLt` have no Lean source. Lean core gets the
+first two from `Nat.noConfusion`, and its order is `Nat.lt`, which is
+`Nat.le` and not a witness record. The table lists no row for `add`,
+`mul` and `one`, because those three are the Lean core declarations
+`Nat.add`, `Nat.mul` and the numeral, and not theorems.
+
+`test/check.py` runs in about 7.5 seconds of wall time on the pinned
+checker, for all 116 cases.
 
 ## Scope and trust
 
@@ -682,7 +798,7 @@ three fields that the record gained.
 
 ## Validation
 
-On 2026-09-06, all ninety-seven checks passed with checker SHA-256
+On 2026-09-06, all 116 checks passed with checker SHA-256
 `30c4524d57f6723e39ba117097222f3ab8ef3e899a8a4af8b7e60c68337842bf` at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe`,
 built from tot commit `8cf0b8b` with a clean tree. Build that commit to
@@ -691,7 +807,7 @@ reproduce the reference checker.
 The checker reports every rejection in this repository with the word
 `mismatch`, except the axiom case, which reports `axiom`.
 
-The ninety-seven checks:
+The 116 checks:
 
 - The theorem checks without a prelude or axioms.
 - The proof is rejected against a commuted right side, `fmul y x`.
@@ -824,7 +940,27 @@ The ninety-seven checks:
   `sym0` of `addRemoveRoundtripX` and passes the cross identity to
   `subst0` directly, and is rejected at `addRemoveRoundtripX`.
 
-For the sixty-six checks that M3a, M3b, M3c and M3d add, the runner also
+- Nineteen checks, one for each theorem of `src/Nat.tot`. Each check
+  changes the result type of the theorem and keeps the proof, so each
+  one is rejected at its own def: `wrong-nat-succ-inj` at `succInj`,
+  `wrong-nat-zero-not-succ` at `zeroNotSucc`, `wrong-nat-add-zero` at
+  `addZero`, `wrong-nat-add-comm` at `addComm`, `wrong-nat-add-assoc`
+  at `addAssoc`, `wrong-nat-mul-comm` at `mulComm`,
+  `wrong-nat-mul-assoc` at `mulAssoc`, `wrong-nat-mul-one` at `mulOne`,
+  `wrong-nat-mul-add` at `mulAdd`, `wrong-nat-add-cancel-left` at
+  `addCancelLeft`, `wrong-nat-lt-irrefl` at `ltIrrefl`,
+  `wrong-nat-lt-trans` at `ltTrans`, `wrong-nat-add-lt-add-left` at
+  `addLtAddLeft`, `wrong-nat-mul-pos` at `mulPos`,
+  `wrong-nat-lt-trichotomy` at `ltTrichotomy`, `wrong-nat-zero-ne-one`
+  at `zeroNeOne`, `wrong-nat-sub-add` at `subAdd`,
+  `wrong-nat-lt-of-add-lt-add-left` at `natLtOfAddLtAddLeft` and
+  `wrong-nat-dec-eq` at `natDecEq`. The four helpers `addSuccRight`,
+  `mulZeroRight`, `mulSuccRight` and `addMulRight` get no negative of
+  their own, because a mutation of any of them is caught by the theorem
+  that cites it.
+
+For the eighty-five checks that M3a, M3b, M3c, M3d and M4a add, the
+runner also
 reads
 the position
 of the diagnostic and confirms the name of the first failing def. A
@@ -848,11 +984,12 @@ above.
 
 ## Probe results
 
-Nineteen facts about tot, found with scratch files. The first five come
-from the record milestone, the next five come from the M3a probes, the
-next four come from the M3b probes, the next two come from the M3c
-probes and the last three come from the M3d probes. The scratch files
-are not part of this repository.
+Twenty-three facts about tot, found with scratch files. The first five
+come from the record milestone, the next five come from the M3a probes,
+the next four come from the M3b probes, the next two come from the M3c
+probes, the next three come from the M3d probes and the last four come
+from the M4a probes. The scratch files are not part of this
+repository.
 
 - A data record that bundles the eight field laws checks when the law
   fields carry quantity w. When the fields carry quantity 0 and a def
@@ -950,6 +1087,25 @@ are not part of this repository.
   `addLiquidity`. The checker converts them. The control drops one
   `trans0` layer of the chain and the checker rejects it.
 
+- (o) A data type former carries its parameters at quantity 0, while
+  `Trichotomy` takes its relation at quantity w. `Trichotomy Nat NatLt`
+  is therefore rejected, and data parameters cannot be marked w. A
+  relation that `Trichotomy` accepts is a reducible def over the data
+  type, `natLt m n`, whose delta step joins it to `NatLt m n`.
+- (p) A match that is applied to an argument must be parenthesized. The
+  form `match ... end h` is a parse error, and `(match ... end) h` is
+  accepted. `addCancelLeft` needs that form, because the match on `k`
+  cannot refine the type of the hypothesis, so it returns a function.
+- (q) The inductive order relation checks too, and it costs two more
+  defs, three more recursions, two inversion helpers, four index motives
+  and one `exfalso`. The witness record is therefore the prescribed
+  form.
+- (r) The name `ltOfAddLtAddLeft` is already a global of
+  `src/Order.tot`, and the sixteen files share one namespace, so the
+  `Nat` lemma is `natLtOfAddLtAddLeft`. A sweep of the 42 names of M4a
+  against the 141 globals of the fifteen earlier files finds that one
+  collision and no other.
+
 The five M3c probes Q1 to Q5 were all green on the first attempt, so
 they forced no change to any statement and no change to any term of the
 design notes. The six M3d probes R1 to R6 were all green on the first
@@ -959,13 +1115,21 @@ stand in the unfolded form, and no `subst0` replaces a `cong0` step.
 
 ## Next milestones
 
-1. Supply a concrete carrier: an inhabitant of `OrderedField` for one
-   type, so that both theorems have a closed instance. tot has no
-   rationals, so the carrier is a milestone of its own.
+Milestone M4 supplies a concrete carrier: an inhabitant of
+`OrderedField` for one type, so that every theorem has a closed
+instance. Every ordered field is infinite, so the carrier is the
+rationals, and M4 is cut into five slices.
 
-Sources, seventeen files: `src/Foundation.tot`, `src/Field.tot`,
+1. M4a, the natural numbers, `src/Nat.tot`. Done, this commit.
+2. M4b, the integers, `src/Int.tot`.
+3. M4c, divisibility and the greatest common divisor, `src/Gcd.tot`.
+4. M4d, the reduced fractions and the field laws, `src/Rat.tot`.
+5. M4e, the order, the `OrderedField` inhabitant and the closed
+   instance, `src/RatOrder.tot` and `src/Instance.tot`.
+
+Sources, eighteen files: `src/Foundation.tot`, `src/Field.tot`,
 `src/Invariant.tot`, `src/Axioms.tot`, `src/Ring.tot`, `src/Laws.tot`,
 `src/Compose.tot`, `src/Frac.tot`, `src/Order.tot`, `src/Pool.tot`,
 `src/Basic.tot`, `src/Product.tot`, `src/NoDrain.tot`,
-`src/PriceImpact.tot`, `src/Liquidity.tot`, `test/check.py`,
-`README.md`. The first fifteen are the check order.
+`src/PriceImpact.tot`, `src/Liquidity.tot`, `src/Nat.tot`,
+`test/check.py`, `README.md`. The first sixteen are the check order.

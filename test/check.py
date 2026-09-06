@@ -13,7 +13,7 @@ DEFAULT_TOT = Path("/Users/oobi/Documents/kan-lang-tot-pin/"
 TOT = Path(os.environ.get("TOT", DEFAULT_TOT))
 NAMES = ["Foundation", "Field", "Invariant", "Axioms", "Ring", "Laws",
          "Compose", "Frac", "Order", "Pool", "Basic", "Product", "NoDrain",
-         "PriceImpact", "Liquidity"]
+         "PriceImpact", "Liquidity", "Nat"]
 FILES = {name: (ROOT / "src" / f"{name}.tot").read_text() for name in NAMES}
 FIELD = FILES["Field"]
 INVARIANT = FILES["Invariant"]
@@ -176,7 +176,8 @@ def mutate_pool(pairs):
 def def_span(name, source=None, where="Laws.tot"):
     """Return the span of one def, from its header to its check line."""
     text = LAWS_SRC if source is None else source
-    header = re.search(rf"^(?:reducible )?def {name}\b", text, re.MULTILINE)
+    header = re.search(rf"^(?:reducible )?def (?:rec )?{name}\b", text,
+                       re.MULTILINE)
     if header is None:
         raise SystemExit(f"def not found in {where}: {name}")
     return header.start(), text.index(f"\ncheck {name}\n", header.start())
@@ -623,6 +624,71 @@ M3D_NEGATIVES = [
      "addRemoveRoundtripX"),
 ]
 
+# The nineteen result-type negatives of src/Nat.tot that M4a adds:
+# (case, def, old, new). Every case changes the result type of one
+# theorem and keeps its proof, so the first failing def is the mutated
+# def itself. Every anchor takes the trailing ":=" of the def header, so
+# the count stays 1 and no step of the body changes.
+NAT_NEGATIVES = [
+    ("wrong-nat-succ-inj", "succInj",
+     "(0 h : Eq Nat (succ m) (succ n)) -> Eq Nat m n :=",
+     "(0 h : Eq Nat (succ m) (succ n)) -> Eq Nat n m :="),
+    ("wrong-nat-zero-not-succ", "zeroNotSucc",
+     "(0 h : Eq Nat zero (succ n)) -> Empty :=",
+     "(0 h : Eq Nat (succ n) zero) -> Empty :="),
+    ("wrong-nat-add-zero", "addZero",
+     "(a : Nat) -> Eq Nat (add a zero) a :=",
+     "(a : Nat) -> Eq Nat (add zero a) a :="),
+    ("wrong-nat-add-comm", "addComm",
+     "Eq Nat (add a b) (add b a) :=",
+     "Eq Nat (add a b) (mul b a) :="),
+    ("wrong-nat-add-assoc", "addAssoc",
+     "Eq Nat (add (add a b) c) (add a (add b c)) :=",
+     "Eq Nat (add (add a b) c) (add b (add a c)) :="),
+    ("wrong-nat-mul-comm", "mulComm",
+     "Eq Nat (mul a b) (mul b a) :=",
+     "Eq Nat (mul a b) (add b a) :="),
+    ("wrong-nat-mul-assoc", "mulAssoc",
+     "Eq Nat (mul (mul a b) c) (mul a (mul b c)) :=",
+     "Eq Nat (mul (mul a b) c) (mul b (mul a c)) :="),
+    ("wrong-nat-mul-one", "mulOne",
+     "(a : Nat) -> Eq Nat (mul a one) a :=",
+     "(a : Nat) -> Eq Nat (mul a one) one :="),
+    ("wrong-nat-mul-add", "mulAdd",
+     "Eq Nat (mul a (add b c)) (add (mul a b) (mul a c)) :=",
+     "Eq Nat (mul a (add b c)) (add (mul a b) (mul b c)) :="),
+    ("wrong-nat-add-cancel-left", "addCancelLeft",
+     "(h : Eq Nat (add k m) (add k n)) -> Eq Nat m n :=",
+     "(h : Eq Nat (add m k) (add n k)) -> Eq Nat m n :="),
+    ("wrong-nat-lt-irrefl", "ltIrrefl",
+     "(a : Nat) -> (h : natLt a a) -> Empty :=",
+     "(a : Nat) -> (h : natLt zero a) -> Empty :="),
+    ("wrong-nat-lt-trans", "ltTrans",
+     "(h1 : natLt a b) -> (h2 : natLt b c) -> natLt a c :=",
+     "(h1 : natLt a b) -> (h2 : natLt b c) -> natLt c a :="),
+    ("wrong-nat-add-lt-add-left", "addLtAddLeft",
+     "(h : natLt b c) -> natLt (add a b) (add a c) :=",
+     "(h : natLt b c) -> natLt (add b a) (add c a) :="),
+    ("wrong-nat-mul-pos", "mulPos",
+     "natLt zero (mul a b) :=",
+     "natLt zero (add a b) :="),
+    ("wrong-nat-lt-trichotomy", "ltTrichotomy",
+     "(a : Nat) -> (b : Nat) -> Trichotomy Nat natLt a b :=",
+     "(a : Nat) -> (b : Nat) -> Trichotomy Nat natLt b a :="),
+    ("wrong-nat-zero-ne-one", "zeroNeOne",
+     "(0 e : Eq Nat zero one) -> Empty :=",
+     "(0 e : Eq Nat one zero) -> Empty :="),
+    ("wrong-nat-sub-add", "subAdd",
+     "(h : natLt m n) -> Eq Nat (add m (sub n m)) n :=",
+     "(h : natLt m n) -> Eq Nat (add m (sub n m)) m :="),
+    ("wrong-nat-lt-of-add-lt-add-left", "natLtOfAddLtAddLeft",
+     "(h : natLt (add a b) (add a c)) -> natLt b c :=",
+     "(h : natLt (add a b) (add a c)) -> natLt c b :="),
+    ("wrong-nat-dec-eq", "natDecEq",
+     "(m : Nat) -> (n : Nat) -> Dec (Eq Nat m n) :=",
+     "(m : Nat) -> (n : Nat) -> Dec (Eq Nat n m) :="),
+]
+
 # A case is (name, full source, expected diagnostic word).
 # None: the checker must accept. A string: the checker must exit with
 # status 1 and print that string in its diagnostic.
@@ -687,7 +753,10 @@ CASES = [
     # The thirteen result-type negatives and the four proof negatives of
     # src/PriceImpact.tot and src/Liquidity.tot that M3d adds.
     (name, mutate_in_def(file_name, def_name, old, new), "mismatch")
-    for name, file_name, def_name, old, new, _failing in M3D_NEGATIVES]
+    for name, file_name, def_name, old, new, _failing in M3D_NEGATIVES] + [
+    # The nineteen result-type negatives of src/Nat.tot that M4a adds.
+    (name, mutate_in_def("Nat", def_name, old, new), "mismatch")
+    for name, def_name, old, new in NAT_NEGATIVES]
 
 # The def that must fail first, for every case that M3a adds. The name
 # comes from the position of the diagnostic, so a mutation that moves the
@@ -708,6 +777,8 @@ FAILING_DEFS = {
        for name, _file, _def_name, _old, _new, failing in M3C_NEGATIVES},
     **{name: failing
        for name, _file, _def_name, _old, _new, failing in M3D_NEGATIVES},
+    **{name: def_name
+       for name, def_name, _old, _new in NAT_NEGATIVES},
 }
 
 def failing_def(source, result):
@@ -718,7 +789,7 @@ def failing_def(source, result):
     line = int(position.group(1))
     heads = [(number, head.group(1))
              for number, text in enumerate(source.splitlines(), 1)
-             for head in [re.match(r"(?:reducible )?def (\w+)", text)]
+             for head in [re.match(r"(?:reducible )?def (?:rec )?(\w+)", text)]
              if head is not None]
     earlier = [name for number, name in heads if number <= line]
     return earlier[-1] if earlier else None

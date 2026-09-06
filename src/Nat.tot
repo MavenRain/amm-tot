@@ -1,0 +1,318 @@
+-- The natural numbers, the semiring laws, the order and the M4b
+-- interface. This is M4a, the first slice of the concrete carrier, and
+-- the file stands after src/Liquidity.tot in the check order.
+-- data Nat, add and mul are the stdlib prelude shapes of
+-- stdlib/prelude.tot at commit 8cf0b8b. add and mul recur on the FIRST
+-- argument, so add zero n and mul zero n reduce, and add m zero and
+-- mul m zero need induction.
+-- A plain def rec is opaque to conversion, so every computing def is a
+-- reducible def rec (add, mul, sub) or a reducible def (one, pred,
+-- natFamZero, natLt). Every proof is a plain def or a plain def rec.
+-- Induction is a recursive proof whose motive rides the match, in the
+-- form match n as x return T with.
+-- The order is the witness record NatLt: m < n holds when one k has
+-- add m (succ k) = n. ltIrrefl, ltTrans, addLtAddLeft, mulPos, subAdd
+-- and natLtOfAddLtAddLeft are then equational and need no recursion,
+-- and M4b reads the difference k off the witness.
+-- natLt is a reducible def over NatLt, because Trichotomy takes its
+-- relation at quantity w while a data type former carries 0 parameters.
+-- The check lines stand at the end of the file, one for each def.
+
+data Nat : Type 0 := | zero : Nat | succ : (n : Nat) -> Nat
+
+reducible def rec add : Nat -> Nat -> Nat :=
+  fun m n => match m with | zero => n | succ p => succ (add p n) end
+
+reducible def rec mul : Nat -> Nat -> Nat :=
+  fun m n => match m with | zero => zero | succ p => add n (mul p n) end
+
+reducible def one : Nat := succ zero
+
+reducible def pred : Nat -> Nat := fun n => match n with | zero => zero | succ p => p end
+
+reducible def natFamZero : Nat -> Type 0 :=
+  fun n => match n with | zero => Eq Nat zero zero | succ p => Empty end
+
+def succInj : (0 m : Nat) -> (0 n : Nat) -> (0 h : Eq Nat (succ m) (succ n)) -> Eq Nat m n :=
+  fun m n h => cong0 Nat Nat (succ m) (succ n) pred h
+
+def zeroNotSucc : (0 n : Nat) -> (0 h : Eq Nat zero (succ n)) -> Empty :=
+  fun n h => subst0 Nat zero (succ n) natFamZero h (refl Nat zero)
+
+def rec addZero : (a : Nat) -> Eq Nat (add a zero) a :=
+  fun a => match a as x return Eq Nat (add x zero) x with
+    | zero => refl Nat zero
+    | succ p => cong0 Nat Nat (add p zero) p succ (addZero p)
+    end
+
+def rec addSuccRight : (m : Nat) -> (n : Nat) -> Eq Nat (add m (succ n)) (succ (add m n)) :=
+  fun m n => match m as x return Eq Nat (add x (succ n)) (succ (add x n)) with
+    | zero => refl Nat (succ n)
+    | succ p => cong0 Nat Nat (add p (succ n)) (succ (add p n)) succ (addSuccRight p n)
+    end
+
+def rec addComm : (a : Nat) -> (b : Nat) -> Eq Nat (add a b) (add b a) :=
+  fun a b => match a as x return Eq Nat (add x b) (add b x) with
+    | zero => sym0 Nat (add b zero) b (addZero b)
+    | succ p => trans0 Nat (succ (add p b)) (succ (add b p)) (add b (succ p))
+        (cong0 Nat Nat (add p b) (add b p) succ (addComm p b))
+        (sym0 Nat (add b (succ p)) (succ (add b p)) (addSuccRight b p))
+    end
+
+def rec addAssoc : (a : Nat) -> (b : Nat) -> (c : Nat) -> Eq Nat (add (add a b) c) (add a (add b c)) :=
+  fun a b c => match a as x return Eq Nat (add (add x b) c) (add x (add b c)) with
+    | zero => refl Nat (add b c)
+    | succ p => cong0 Nat Nat (add (add p b) c) (add p (add b c)) succ (addAssoc p b c)
+    end
+
+def addLeftComm : (a : Nat) -> (b : Nat) -> (c : Nat) -> Eq Nat (add a (add b c)) (add b (add a c)) :=
+  fun a b c =>
+    trans0 Nat (add a (add b c)) (add (add a b) c) (add b (add a c))
+      (sym0 Nat (add (add a b) c) (add a (add b c)) (addAssoc a b c))
+      (trans0 Nat (add (add a b) c) (add (add b a) c) (add b (add a c))
+        (cong0 Nat Nat (add a b) (add b a) (fun z => add z c) (addComm a b))
+        (addAssoc b a c))
+
+def rec addCancelLeft : (k : Nat) -> (m : Nat) -> (n : Nat) -> (h : Eq Nat (add k m) (add k n)) -> Eq Nat m n :=
+  fun k m n h =>
+    (match k as x return (hx : Eq Nat (add x m) (add x n)) -> Eq Nat m n with
+     | zero => fun hz => hz
+     | succ p => fun hs => addCancelLeft p m n (succInj (add p m) (add p n) hs)
+     end) h
+
+def rec mulZeroRight : (a : Nat) -> Eq Nat (mul a zero) zero :=
+  fun a => match a as x return Eq Nat (mul x zero) zero with
+    | zero => refl Nat zero
+    | succ p => mulZeroRight p
+    end
+
+def rec mulSuccRight : (a : Nat) -> (b : Nat) -> Eq Nat (mul a (succ b)) (add a (mul a b)) :=
+  fun a b => match a as x return Eq Nat (mul x (succ b)) (add x (mul x b)) with
+    | zero => refl Nat zero
+    | succ p => cong0 Nat Nat (add b (mul p (succ b))) (add p (add b (mul p b))) succ
+        (trans0 Nat (add b (mul p (succ b))) (add b (add p (mul p b))) (add p (add b (mul p b)))
+          (cong0 Nat Nat (mul p (succ b)) (add p (mul p b)) (fun z => add b z) (mulSuccRight p b))
+          (addLeftComm b p (mul p b)))
+    end
+
+def rec mulComm : (a : Nat) -> (b : Nat) -> Eq Nat (mul a b) (mul b a) :=
+  fun a b => match a as x return Eq Nat (mul x b) (mul b x) with
+    | zero => sym0 Nat (mul b zero) zero (mulZeroRight b)
+    | succ p => trans0 Nat (add b (mul p b)) (add b (mul b p)) (mul b (succ p))
+        (cong0 Nat Nat (mul p b) (mul b p) (fun z => add b z) (mulComm p b))
+        (sym0 Nat (mul b (succ p)) (add b (mul b p)) (mulSuccRight b p))
+    end
+
+def rec addMulRight : (a : Nat) -> (b : Nat) -> (c : Nat) -> Eq Nat (mul (add a b) c) (add (mul a c) (mul b c)) :=
+  fun a b c => match a as x return Eq Nat (mul (add x b) c) (add (mul x c) (mul b c)) with
+    | zero => refl Nat (mul b c)
+    | succ p => trans0 Nat (add c (mul (add p b) c)) (add c (add (mul p c) (mul b c)))
+        (add (add c (mul p c)) (mul b c))
+        (cong0 Nat Nat (mul (add p b) c) (add (mul p c) (mul b c)) (fun z => add c z)
+          (addMulRight p b c))
+        (sym0 Nat (add (add c (mul p c)) (mul b c)) (add c (add (mul p c) (mul b c)))
+          (addAssoc c (mul p c) (mul b c)))
+    end
+
+def rec mulAssoc : (a : Nat) -> (b : Nat) -> (c : Nat) -> Eq Nat (mul (mul a b) c) (mul a (mul b c)) :=
+  fun a b c => match a as x return Eq Nat (mul (mul x b) c) (mul x (mul b c)) with
+    | zero => refl Nat zero
+    | succ p => trans0 Nat (mul (add b (mul p b)) c) (add (mul b c) (mul (mul p b) c))
+        (add (mul b c) (mul p (mul b c)))
+        (addMulRight b (mul p b) c)
+        (cong0 Nat Nat (mul (mul p b) c) (mul p (mul b c)) (fun z => add (mul b c) z)
+          (mulAssoc p b c))
+    end
+
+def mulOne : (a : Nat) -> Eq Nat (mul a one) a :=
+  fun a =>
+    trans0 Nat (mul a (succ zero)) (add a (mul a zero)) a
+      (mulSuccRight a zero)
+      (trans0 Nat (add a (mul a zero)) (add a zero) a
+        (cong0 Nat Nat (mul a zero) zero (fun z => add a z) (mulZeroRight a))
+        (addZero a))
+
+def mulAdd : (a : Nat) -> (b : Nat) -> (c : Nat) -> Eq Nat (mul a (add b c)) (add (mul a b) (mul a c)) :=
+  fun a b c =>
+    trans0 Nat (mul a (add b c)) (mul (add b c) a) (add (mul a b) (mul a c))
+      (mulComm a (add b c))
+      (trans0 Nat (mul (add b c) a) (add (mul b a) (mul c a)) (add (mul a b) (mul a c))
+        (addMulRight b c a)
+        (trans0 Nat (add (mul b a) (mul c a)) (add (mul a b) (mul c a)) (add (mul a b) (mul a c))
+          (cong0 Nat Nat (mul b a) (mul a b) (fun z => add z (mul c a)) (mulComm b a))
+          (cong0 Nat Nat (mul c a) (mul a c) (fun z => add (mul a b) z) (mulComm c a))))
+
+data NatLt (0 m : Nat) (0 n : Nat) : Type 0 :=
+  | ltWitness : (k : Nat) -> (e : Eq Nat (add m (succ k)) n) -> NatLt m n
+
+reducible def natLt : Nat -> Nat -> Type 0 := fun m n => NatLt m n
+
+def ltIrrefl : (a : Nat) -> (h : natLt a a) -> Empty :=
+  fun a h => match h as w return Empty with
+    | ltWitness k e =>
+        zeroNotSucc k
+          (sym0 Nat (succ k) zero
+            (addCancelLeft a (succ k) zero
+              (trans0 Nat (add a (succ k)) a (add a zero) e
+                (sym0 Nat (add a zero) a (addZero a)))))
+    end
+
+def ltTrans : (a : Nat) -> (b : Nat) -> (c : Nat) -> (h1 : natLt a b) -> (h2 : natLt b c) -> natLt a c :=
+  fun a b c h1 h2 => match h1 as w1 return natLt a c with
+    | ltWitness k1 e1 =>
+        match h2 as w2 return natLt a c with
+        | ltWitness k2 e2 =>
+            ltWitness a c (add k1 (succ k2))
+              (trans0 Nat (add a (succ (add k1 (succ k2)))) (add (add a (succ k1)) (succ k2)) c
+                (sym0 Nat (add (add a (succ k1)) (succ k2)) (add a (succ (add k1 (succ k2))))
+                  (addAssoc a (succ k1) (succ k2)))
+                (trans0 Nat (add (add a (succ k1)) (succ k2)) (add b (succ k2)) c
+                  (cong0 Nat Nat (add a (succ k1)) b (fun z => add z (succ k2)) e1)
+                  e2))
+        end
+    end
+
+def addLtAddLeft : (a : Nat) -> (b : Nat) -> (c : Nat) -> (h : natLt b c) -> natLt (add a b) (add a c) :=
+  fun a b c h => match h as w return natLt (add a b) (add a c) with
+    | ltWitness k e =>
+        ltWitness (add a b) (add a c) k
+          (trans0 Nat (add (add a b) (succ k)) (add a (add b (succ k))) (add a c)
+            (addAssoc a b (succ k))
+            (cong0 Nat Nat (add b (succ k)) c (fun z => add a z) e))
+    end
+
+def mulPos : (a : Nat) -> (b : Nat) -> (ha : natLt zero a) -> (hb : natLt zero b) -> natLt zero (mul a b) :=
+  fun a b ha hb => match ha as w1 return natLt zero (mul a b) with
+    | ltWitness k1 e1 =>
+        match hb as w2 return natLt zero (mul a b) with
+        | ltWitness k2 e2 =>
+            ltWitness zero (mul a b) (add k2 (mul k1 (succ k2)))
+              (trans0 Nat (mul (succ k1) (succ k2)) (mul a (succ k2)) (mul a b)
+                (cong0 Nat Nat (succ k1) a (fun z => mul z (succ k2)) e1)
+                (cong0 Nat Nat (succ k2) b (fun z => mul a z) e2))
+        end
+    end
+
+def succLtSucc : (a : Nat) -> (b : Nat) -> (h : natLt a b) -> natLt (succ a) (succ b) :=
+  fun a b h => match h as w return natLt (succ a) (succ b) with
+    | ltWitness k e =>
+        ltWitness (succ a) (succ b) k (cong0 Nat Nat (add a (succ k)) b succ e)
+    end
+
+def rec ltTrichotomy : (a : Nat) -> (b : Nat) -> Trichotomy Nat natLt a b :=
+  fun a b => match a as x return Trichotomy Nat natLt x b with
+    | zero => match b as y return Trichotomy Nat natLt zero y with
+        | zero => isEq Nat natLt zero zero (refl Nat zero)
+        | succ q => isLt Nat natLt zero (succ q) (ltWitness zero (succ q) q (refl Nat (succ q)))
+        end
+    | succ p => match b as y return Trichotomy Nat natLt (succ p) y with
+        | zero => isGt Nat natLt (succ p) zero (ltWitness zero (succ p) p (refl Nat (succ p)))
+        | succ q => match ltTrichotomy p q as t return Trichotomy Nat natLt (succ p) (succ q) with
+            | isLt h => isLt Nat natLt (succ p) (succ q) (succLtSucc p q h)
+            | isEq e => isEq Nat natLt (succ p) (succ q) (cong0 Nat Nat p q succ e)
+            | isGt h => isGt Nat natLt (succ p) (succ q) (succLtSucc q p h)
+            end
+        end
+    end
+
+def zeroNeOne : (0 e : Eq Nat zero one) -> Empty :=
+  fun e => zeroNotSucc zero e
+
+reducible def rec sub : Nat -> Nat -> Nat :=
+  fun m n => match m with
+    | zero => zero
+    | succ p => match n with | zero => succ p | succ q => sub p q end
+    end
+
+def subZeroRight : (a : Nat) -> Eq Nat (sub a zero) a :=
+  fun a => match a as x return Eq Nat (sub x zero) x with
+    | zero => refl Nat zero
+    | succ p => refl Nat (succ p)
+    end
+
+def rec subAddCancelLeft : (m : Nat) -> (x : Nat) -> Eq Nat (sub (add m x) m) x :=
+  fun m x => match m as y return Eq Nat (sub (add y x) y) x with
+    | zero => subZeroRight x
+    | succ p => subAddCancelLeft p x
+    end
+
+def subAdd : (m : Nat) -> (n : Nat) -> (h : natLt m n) -> Eq Nat (add m (sub n m)) n :=
+  fun m n h => match h as w return Eq Nat (add m (sub n m)) n with
+    | ltWitness k e =>
+        trans0 Nat (add m (sub n m)) (add m (sub (add m (succ k)) m)) n
+          (cong0 Nat Nat n (add m (succ k)) (fun z => add m (sub z m))
+            (sym0 Nat (add m (succ k)) n e))
+          (trans0 Nat (add m (sub (add m (succ k)) m)) (add m (succ k)) n
+            (cong0 Nat Nat (sub (add m (succ k)) m) (succ k) (fun z => add m z)
+              (subAddCancelLeft m (succ k)))
+            e)
+    end
+
+def natLtOfAddLtAddLeft : (a : Nat) -> (b : Nat) -> (c : Nat) -> (h : natLt (add a b) (add a c)) -> natLt b c :=
+  fun a b c h => match h as w return natLt b c with
+    | ltWitness k e =>
+        ltWitness b c k
+          (addCancelLeft a (add b (succ k)) c
+            (trans0 Nat (add a (add b (succ k))) (add (add a b) (succ k)) (add a c)
+              (sym0 Nat (add (add a b) (succ k)) (add a (add b (succ k))) (addAssoc a b (succ k)))
+              e))
+    end
+
+data Dec (0 P : Type 0) : Type 0 :=
+  | yes : (0 p : P) -> Dec P
+  | no : (0 np : P -> Empty) -> Dec P
+
+def rec natDecEq : (m : Nat) -> (n : Nat) -> Dec (Eq Nat m n) :=
+  fun m n =>
+    match m as mm return Dec (Eq Nat mm n) with
+    | zero =>
+        match n as nn return Dec (Eq Nat zero nn) with
+        | zero => yes (Eq Nat zero zero) (refl Nat zero)
+        | succ p => no (Eq Nat zero (succ p)) (fun h => zeroNotSucc p h)
+        end
+    | succ q =>
+        match n as nn return Dec (Eq Nat (succ q) nn) with
+        | zero => no (Eq Nat (succ q) zero)
+            (fun h => zeroNotSucc q (sym0 Nat (succ q) zero h))
+        | succ r =>
+            match natDecEq q r as d return Dec (Eq Nat (succ q) (succ r)) with
+            | yes p => yes (Eq Nat (succ q) (succ r)) (cong0 Nat Nat q r succ p)
+            | no np => no (Eq Nat (succ q) (succ r)) (fun h => np (succInj q r h))
+            end
+        end
+    end
+
+check add
+check mul
+check one
+check pred
+check natFamZero
+check succInj
+check zeroNotSucc
+check addZero
+check addSuccRight
+check addComm
+check addAssoc
+check addLeftComm
+check addCancelLeft
+check mulZeroRight
+check mulSuccRight
+check mulComm
+check addMulRight
+check mulAssoc
+check mulOne
+check mulAdd
+check natLt
+check ltIrrefl
+check ltTrans
+check addLtAddLeft
+check mulPos
+check succLtSucc
+check ltTrichotomy
+check zeroNeOne
+check sub
+check subZeroRight
+check subAddCancelLeft
+check subAdd
+check natLtOfAddLtAddLeft
+check natDecEq
