@@ -1,0 +1,1106 @@
+-- The integers, their ring laws, their order and the interface that
+-- M4c, M4d and M4e read. This is M4b, the second slice of the concrete
+-- carrier, and the file stands after src/Nat.tot in the check order.
+-- data Int is the Lean core shape: pos n is n, and negsucc n is the
+-- negation of succ n. Zero is pos zero and one is pos one.
+-- The arithmetic rides one canonical difference function, intMk a b,
+-- which is a minus b in canonical form. intMk (succ a) (succ b) is
+-- intMk a b by conversion, so the shift needs no lemma, and every law
+-- is one equational chain over intMk forms.
+-- A plain def rec is opaque to conversion, so every computing def is a
+-- reducible def rec (intMk) or a reducible def (intZero, intOne,
+-- negOfNat, intNeg, intAdd, intMul, natAbs, intFamPos, intLt). Every
+-- proof is a plain def or a plain def rec.
+-- The structural guard accepts recursion on an argument that is not
+-- the first, so intAddPosMk, intAddNegsuccMk, intMulPosMk and
+-- intMulNegsuccMk hold the factor m first and recur on c.
+-- data IntRepr and intReprOf say that every integer is a canonical
+-- difference. A law of three variables, or a law that mixes intAdd and
+-- intMul, is a wrapper that opens the representations and transports
+-- its goal to a core lemma on intMk forms. A law of one or two
+-- variables is a direct constructor split, which is cheaper.
+-- The order record IntLt erases its witness fields, so the four order
+-- laws accept erased hypotheses, as OrderedField requires. intLt wraps
+-- IntLt to give Trichotomy a relation with quantity w parameters.
+-- The check lines stand at the end of the file, one for each def.
+
+data Int : Type 0 := | pos : (n : Nat) -> Int | negsucc : (n : Nat) -> Int
+
+reducible def intZero : Int := pos zero
+
+reducible def intOne : Int := pos one
+
+reducible def negOfNat : Nat -> Int :=
+  fun n => match n with | zero => pos zero | succ p => negsucc p end
+
+reducible def rec intMk : Nat -> Nat -> Int :=
+  fun a b => match a with
+    | zero => negOfNat b
+    | succ p => match b with | zero => pos (succ p) | succ q => intMk p q end
+    end
+
+reducible def intNeg : Int -> Int :=
+  fun x => match x with | pos n => negOfNat n | negsucc n => pos (succ n) end
+
+reducible def intAdd : Int -> Int -> Int :=
+  fun x y => match x with
+    | pos m => match y with
+        | pos n => pos (add m n)
+        | negsucc n => intMk m (succ n)
+        end
+    | negsucc m => match y with
+        | pos n => intMk n (succ m)
+        | negsucc n => negsucc (succ (add m n))
+        end
+    end
+
+reducible def intMul : Int -> Int -> Int :=
+  fun x y => match x with
+    | pos m => match y with
+        | pos n => pos (mul m n)
+        | negsucc n => negOfNat (mul m (succ n))
+        end
+    | negsucc m => match y with
+        | pos n => negOfNat (mul (succ m) n)
+        | negsucc n => pos (mul (succ m) (succ n))
+        end
+    end
+
+reducible def natAbs : Int -> Nat :=
+  fun x => match x with | pos n => n | negsucc n => succ n end
+
+reducible def intFamPos : Int -> Type 0 :=
+  fun x => match x with | pos n => Eq Nat zero zero | negsucc n => Empty end
+
+def posInj : (0 m : Nat) -> (0 n : Nat) -> (0 h : Eq Int (pos m) (pos n)) -> Eq Nat m n :=
+  fun m n h => cong0 Int Nat (pos m) (pos n) natAbs h
+
+def negsuccInj : (0 m : Nat) -> (0 n : Nat) -> (0 h : Eq Int (negsucc m) (negsucc n)) -> Eq Nat m n :=
+  fun m n h => succInj m n (cong0 Int Nat (negsucc m) (negsucc n) natAbs h)
+
+def posNeNegsucc : (0 m : Nat) -> (0 n : Nat) -> (0 h : Eq Int (pos m) (negsucc n)) -> Empty :=
+  fun m n h => subst0 Int (pos m) (negsucc n) intFamPos h (refl Nat zero)
+
+def natAbsNegOfNat : (n : Nat) -> Eq Nat (natAbs (negOfNat n)) n :=
+  fun n => match n as x return Eq Nat (natAbs (negOfNat x)) x with
+    | zero => refl Nat zero
+    | succ p => refl Nat (succ p)
+    end
+
+def intMkPos : (n : Nat) -> Eq Int (intMk n zero) (pos n) :=
+  fun n => match n as x return Eq Int (intMk x zero) (pos x) with
+    | zero => refl Int (pos zero)
+    | succ p => refl Int (pos (succ p))
+    end
+
+def intMkNegsucc : (n : Nat) -> Eq Int (intMk zero (succ n)) (negsucc n) :=
+  fun n => refl Int (negsucc n)
+
+def rec intMkAddCancel : (k : Nat) -> (a : Nat) -> (b : Nat) ->
+    Eq Int (intMk (add k a) (add k b)) (intMk a b) :=
+  fun k a b => match k as x return Eq Int (intMk (add x a) (add x b)) (intMk a b) with
+    | zero => refl Int (intMk a b)
+    | succ p => intMkAddCancel p a b
+    end
+
+def intMkCong2 : (0 a : Nat) -> (0 b : Nat) -> (0 c : Nat) -> (0 d : Nat) ->
+    (0 e1 : Eq Nat a c) -> (0 e2 : Eq Nat b d) -> Eq Int (intMk a b) (intMk c d) :=
+  fun a b c d e1 e2 =>
+    trans0 Int (intMk a b) (intMk c b) (intMk c d)
+      (cong0 Nat Int a c (fun z => intMk z b) e1)
+      (cong0 Nat Int b d (fun z => intMk c z) e2)
+
+def intMkEqOfAdd : (p : Nat) -> (q : Nat) -> (r : Nat) -> (s : Nat) ->
+    (0 h : Eq Nat (add p s) (add r q)) -> Eq Int (intMk p q) (intMk r s) :=
+  fun p q r s h =>
+    trans0 Int (intMk p q) (intMk (add s p) (add s q)) (intMk r s)
+      (sym0 Int (intMk (add s p) (add s q)) (intMk p q) (intMkAddCancel s p q))
+      (trans0 Int (intMk (add s p) (add s q)) (intMk (add p s) (add q s)) (intMk r s)
+        (intMkCong2 (add s p) (add s q) (add p s) (add q s)
+          (addComm s p) (addComm s q))
+        (trans0 Int (intMk (add p s) (add q s)) (intMk (add q r) (add q s)) (intMk r s)
+          (intMkCong2 (add p s) (add q s) (add q r) (add q s)
+            (trans0 Nat (add p s) (add r q) (add q r) h (addComm r q))
+            (refl Nat (add q s)))
+          (intMkAddCancel q r s)))
+
+def rec intMkDiag : (n : Nat) -> Eq Int (intMk n n) (pos zero) :=
+  fun n => match n as x return Eq Int (intMk x x) (pos zero) with
+    | zero => refl Int (pos zero)
+    | succ p => intMkDiag p
+    end
+
+data IntRepr (0 x : Int) : Type 0 :=
+  | intRepr : (a : Nat) -> (b : Nat) -> (e : Eq Int (intMk a b) x) -> IntRepr x
+
+def intReprOf : (x : Int) -> IntRepr x :=
+  fun x => match x as y return IntRepr y with
+    | pos n => intRepr (pos n) n zero (intMkPos n)
+    | negsucc n => intRepr (negsucc n) zero (succ n) (refl Int (negsucc n))
+    end
+
+def intAddZeroLeft : (x : Int) -> Eq Int (intAdd (pos zero) x) x :=
+  fun x => match x as y return Eq Int (intAdd (pos zero) y) y with
+    | pos n => refl Int (pos n)
+    | negsucc n => refl Int (negsucc n)
+    end
+
+def rec intAddPosMk : (m : Nat) -> (c : Nat) -> (d : Nat) ->
+    Eq Int (intAdd (pos m) (intMk c d)) (intMk (add m c) d) :=
+  fun m c d => match c as x return Eq Int (intAdd (pos m) (intMk x d)) (intMk (add m x) d) with
+    | zero => match d as y return Eq Int (intAdd (pos m) (intMk zero y)) (intMk (add m zero) y) with
+        | zero => sym0 Int (intMk (add m zero) zero) (pos (add m zero)) (intMkPos (add m zero))
+        | succ q => intMkCong2 m (succ q) (add m zero) (succ q)
+            (sym0 Nat (add m zero) m (addZero m)) (refl Nat (succ q))
+        end
+    | succ p => match d as y return Eq Int (intAdd (pos m) (intMk (succ p) y)) (intMk (add m (succ p)) y) with
+        | zero => sym0 Int (intMk (add m (succ p)) zero) (pos (add m (succ p)))
+            (intMkPos (add m (succ p)))
+        | succ q => trans0 Int (intAdd (pos m) (intMk p q)) (intMk (add m p) q)
+            (intMk (add m (succ p)) (succ q))
+            (intAddPosMk m p q)
+            (intMkCong2 (succ (add m p)) (succ q) (add m (succ p)) (succ q)
+              (sym0 Nat (add m (succ p)) (succ (add m p)) (addSuccRight m p))
+              (refl Nat (succ q)))
+        end
+    end
+
+def rec intAddNegsuccMk : (m : Nat) -> (c : Nat) -> (d : Nat) ->
+    Eq Int (intAdd (negsucc m) (intMk c d)) (intMk c (succ (add m d))) :=
+  fun m c d => match c as x return Eq Int (intAdd (negsucc m) (intMk x d)) (intMk x (succ (add m d))) with
+    | zero => match d as y return Eq Int (intAdd (negsucc m) (intMk zero y)) (intMk zero (succ (add m y))) with
+        | zero => intMkCong2 zero (succ m) zero (succ (add m zero))
+            (refl Nat zero)
+            (cong0 Nat Nat m (add m zero) succ (sym0 Nat (add m zero) m (addZero m)))
+        | succ q => cong0 Nat Int (succ (add m q)) (add m (succ q)) negsucc
+            (sym0 Nat (add m (succ q)) (succ (add m q)) (addSuccRight m q))
+        end
+    | succ p => match d as y return Eq Int (intAdd (negsucc m) (intMk (succ p) y)) (intMk (succ p) (succ (add m y))) with
+        | zero => intMkCong2 (succ p) (succ m) (succ p) (succ (add m zero))
+            (refl Nat (succ p))
+            (cong0 Nat Nat m (add m zero) succ (sym0 Nat (add m zero) m (addZero m)))
+        | succ q => trans0 Int (intAdd (negsucc m) (intMk p q)) (intMk p (succ (add m q)))
+            (intMk (succ p) (succ (add m (succ q))))
+            (intAddNegsuccMk m p q)
+            (intMkCong2 (succ p) (succ (succ (add m q))) (succ p) (succ (add m (succ q)))
+              (refl Nat (succ p))
+              (cong0 Nat Nat (succ (add m q)) (add m (succ q)) succ
+                (sym0 Nat (add m (succ q)) (succ (add m q)) (addSuccRight m q))))
+        end
+    end
+
+def rec intAddMk : (a : Nat) -> (b : Nat) -> (c : Nat) -> (d : Nat) ->
+    Eq Int (intAdd (intMk a b) (intMk c d)) (intMk (add a c) (add b d)) :=
+  fun a b c d => match a as x return Eq Int (intAdd (intMk x b) (intMk c d)) (intMk (add x c) (add b d)) with
+    | zero => match b as y return Eq Int (intAdd (intMk zero y) (intMk c d)) (intMk (add zero c) (add y d)) with
+        | zero => intAddZeroLeft (intMk c d)
+        | succ q => intAddNegsuccMk q c d
+        end
+    | succ p => match b as y return Eq Int (intAdd (intMk (succ p) y) (intMk c d)) (intMk (add (succ p) c) (add y d)) with
+        | zero => intAddPosMk (succ p) c d
+        | succ q => intAddMk p q c d
+        end
+    end
+
+def rec intNegMk : (a : Nat) -> (b : Nat) -> Eq Int (intNeg (intMk a b)) (intMk b a) :=
+  fun a b => match a as x return Eq Int (intNeg (intMk x b)) (intMk b x) with
+    | zero => match b as y return Eq Int (intNeg (intMk zero y)) (intMk y zero) with
+        | zero => refl Int (pos zero)
+        | succ q => refl Int (pos (succ q))
+        end
+    | succ p => match b as y return Eq Int (intNeg (intMk (succ p) y)) (intMk y (succ p)) with
+        | zero => refl Int (negsucc p)
+        | succ q => intNegMk p q
+        end
+    end
+
+def intMulZeroLeft : (x : Int) -> Eq Int (intMul (pos zero) x) (pos zero) :=
+  fun x => match x as y return Eq Int (intMul (pos zero) y) (pos zero) with
+    | pos n => refl Int (pos zero)
+    | negsucc n => refl Int (pos zero)
+    end
+
+def rec intMulPosMk : (m : Nat) -> (c : Nat) -> (d : Nat) ->
+    Eq Int (intMul (pos m) (intMk c d)) (intMk (mul m c) (mul m d)) :=
+  fun m c d => match c as x return Eq Int (intMul (pos m) (intMk x d)) (intMk (mul m x) (mul m d)) with
+    | zero => match d as y return Eq Int (intMul (pos m) (intMk zero y)) (intMk (mul m zero) (mul m y)) with
+        | zero => trans0 Int (pos (mul m zero)) (pos zero) (intMk (mul m zero) (mul m zero))
+            (cong0 Nat Int (mul m zero) zero pos (mulZeroRight m))
+            (sym0 Int (intMk (mul m zero) (mul m zero)) (pos zero) (intMkDiag (mul m zero)))
+        | succ q => intMkCong2 zero (mul m (succ q)) (mul m zero) (mul m (succ q))
+            (sym0 Nat (mul m zero) zero (mulZeroRight m))
+            (refl Nat (mul m (succ q)))
+        end
+    | succ p => match d as y return Eq Int (intMul (pos m) (intMk (succ p) y)) (intMk (mul m (succ p)) (mul m y)) with
+        | zero => trans0 Int (pos (mul m (succ p))) (intMk (mul m (succ p)) zero)
+            (intMk (mul m (succ p)) (mul m zero))
+            (sym0 Int (intMk (mul m (succ p)) zero) (pos (mul m (succ p)))
+              (intMkPos (mul m (succ p))))
+            (intMkCong2 (mul m (succ p)) zero (mul m (succ p)) (mul m zero)
+              (refl Nat (mul m (succ p)))
+              (sym0 Nat (mul m zero) zero (mulZeroRight m)))
+        | succ q => trans0 Int (intMul (pos m) (intMk p q)) (intMk (mul m p) (mul m q))
+            (intMk (mul m (succ p)) (mul m (succ q)))
+            (intMulPosMk m p q)
+            (trans0 Int (intMk (mul m p) (mul m q))
+              (intMk (add m (mul m p)) (add m (mul m q)))
+              (intMk (mul m (succ p)) (mul m (succ q)))
+              (sym0 Int (intMk (add m (mul m p)) (add m (mul m q))) (intMk (mul m p) (mul m q))
+                (intMkAddCancel m (mul m p) (mul m q)))
+              (intMkCong2 (add m (mul m p)) (add m (mul m q)) (mul m (succ p)) (mul m (succ q))
+                (sym0 Nat (mul m (succ p)) (add m (mul m p)) (mulSuccRight m p))
+                (sym0 Nat (mul m (succ q)) (add m (mul m q)) (mulSuccRight m q))))
+        end
+    end
+
+def rec intMulNegsuccMk : (m : Nat) -> (c : Nat) -> (d : Nat) ->
+    Eq Int (intMul (negsucc m) (intMk c d)) (intMk (mul (succ m) d) (mul (succ m) c)) :=
+  fun m c d => match c as x return Eq Int (intMul (negsucc m) (intMk x d)) (intMk (mul (succ m) d) (mul (succ m) x)) with
+    | zero => match d as y return Eq Int (intMul (negsucc m) (intMk zero y)) (intMk (mul (succ m) y) (mul (succ m) zero)) with
+        | zero => trans0 Int (negOfNat (mul (succ m) zero)) (pos zero)
+            (intMk (mul (succ m) zero) (mul (succ m) zero))
+            (cong0 Nat Int (mul (succ m) zero) zero negOfNat (mulZeroRight (succ m)))
+            (sym0 Int (intMk (mul (succ m) zero) (mul (succ m) zero)) (pos zero)
+              (intMkDiag (mul (succ m) zero)))
+        | succ q => trans0 Int (pos (mul (succ m) (succ q))) (intMk (mul (succ m) (succ q)) zero)
+            (intMk (mul (succ m) (succ q)) (mul (succ m) zero))
+            (sym0 Int (intMk (mul (succ m) (succ q)) zero) (pos (mul (succ m) (succ q)))
+              (intMkPos (mul (succ m) (succ q))))
+            (intMkCong2 (mul (succ m) (succ q)) zero (mul (succ m) (succ q)) (mul (succ m) zero)
+              (refl Nat (mul (succ m) (succ q)))
+              (sym0 Nat (mul (succ m) zero) zero (mulZeroRight (succ m))))
+        end
+    | succ p => match d as y return Eq Int (intMul (negsucc m) (intMk (succ p) y)) (intMk (mul (succ m) y) (mul (succ m) (succ p))) with
+        | zero => intMkCong2 zero (mul (succ m) (succ p)) (mul (succ m) zero) (mul (succ m) (succ p))
+            (sym0 Nat (mul (succ m) zero) zero (mulZeroRight (succ m)))
+            (refl Nat (mul (succ m) (succ p)))
+        | succ q => trans0 Int (intMul (negsucc m) (intMk p q)) (intMk (mul (succ m) q) (mul (succ m) p))
+            (intMk (mul (succ m) (succ q)) (mul (succ m) (succ p)))
+            (intMulNegsuccMk m p q)
+            (trans0 Int (intMk (mul (succ m) q) (mul (succ m) p))
+              (intMk (add (succ m) (mul (succ m) q)) (add (succ m) (mul (succ m) p)))
+              (intMk (mul (succ m) (succ q)) (mul (succ m) (succ p)))
+              (sym0 Int (intMk (add (succ m) (mul (succ m) q)) (add (succ m) (mul (succ m) p)))
+                (intMk (mul (succ m) q) (mul (succ m) p))
+                (intMkAddCancel (succ m) (mul (succ m) q) (mul (succ m) p)))
+              (intMkCong2 (add (succ m) (mul (succ m) q)) (add (succ m) (mul (succ m) p))
+                (mul (succ m) (succ q)) (mul (succ m) (succ p))
+                (sym0 Nat (mul (succ m) (succ q)) (add (succ m) (mul (succ m) q))
+                  (mulSuccRight (succ m) q))
+                (sym0 Nat (mul (succ m) (succ p)) (add (succ m) (mul (succ m) p))
+                  (mulSuccRight (succ m) p))))
+        end
+    end
+
+def natAddShuffle : (a : Nat) -> (b : Nat) -> (c : Nat) -> (d : Nat) ->
+    Eq Nat (add (add a b) (add c d)) (add (add a c) (add b d)) :=
+  fun a b c d =>
+    trans0 Nat (add (add a b) (add c d)) (add a (add b (add c d))) (add (add a c) (add b d))
+      (addAssoc a b (add c d))
+      (trans0 Nat (add a (add b (add c d))) (add a (add c (add b d))) (add (add a c) (add b d))
+        (cong0 Nat Nat (add b (add c d)) (add c (add b d)) (fun z => add a z)
+          (addLeftComm b c d))
+        (sym0 Nat (add (add a c) (add b d)) (add a (add c (add b d)))
+          (addAssoc a c (add b d))))
+
+def rec intMulMk : (a : Nat) -> (b : Nat) -> (c : Nat) -> (d : Nat) ->
+    Eq Int (intMul (intMk a b) (intMk c d))
+      (intMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c))) :=
+  fun a b c d => match a as x return Eq Int (intMul (intMk x b) (intMk c d))
+      (intMk (add (mul x c) (mul b d)) (add (mul x d) (mul b c))) with
+    | zero => match b as y return Eq Int (intMul (intMk zero y) (intMk c d))
+        (intMk (add (mul zero c) (mul y d)) (add (mul zero d) (mul y c))) with
+        | zero => intMulZeroLeft (intMk c d)
+        | succ q => intMulNegsuccMk q c d
+        end
+    | succ p => match b as y return Eq Int (intMul (intMk (succ p) y) (intMk c d))
+        (intMk (add (mul (succ p) c) (mul y d)) (add (mul (succ p) d) (mul y c))) with
+        | zero => trans0 Int (intMul (pos (succ p)) (intMk c d))
+            (intMk (mul (succ p) c) (mul (succ p) d))
+            (intMk (add (mul (succ p) c) zero) (add (mul (succ p) d) zero))
+            (intMulPosMk (succ p) c d)
+            (intMkCong2 (mul (succ p) c) (mul (succ p) d)
+              (add (mul (succ p) c) zero) (add (mul (succ p) d) zero)
+              (sym0 Nat (add (mul (succ p) c) zero) (mul (succ p) c) (addZero (mul (succ p) c)))
+              (sym0 Nat (add (mul (succ p) d) zero) (mul (succ p) d) (addZero (mul (succ p) d))))
+        | succ q => trans0 Int (intMul (intMk p q) (intMk c d))
+            (intMk (add (mul p c) (mul q d)) (add (mul p d) (mul q c)))
+            (intMk (add (add c (mul p c)) (add d (mul q d))) (add (add d (mul p d)) (add c (mul q c))))
+            (intMulMk p q c d)
+            (trans0 Int (intMk (add (mul p c) (mul q d)) (add (mul p d) (mul q c)))
+              (intMk (add (add c d) (add (mul p c) (mul q d))) (add (add c d) (add (mul p d) (mul q c))))
+              (intMk (add (add c (mul p c)) (add d (mul q d))) (add (add d (mul p d)) (add c (mul q c))))
+              (sym0 Int (intMk (add (add c d) (add (mul p c) (mul q d))) (add (add c d) (add (mul p d) (mul q c))))
+                (intMk (add (mul p c) (mul q d)) (add (mul p d) (mul q c)))
+                (intMkAddCancel (add c d) (add (mul p c) (mul q d)) (add (mul p d) (mul q c))))
+              (intMkCong2 (add (add c d) (add (mul p c) (mul q d))) (add (add c d) (add (mul p d) (mul q c)))
+                (add (add c (mul p c)) (add d (mul q d))) (add (add d (mul p d)) (add c (mul q c)))
+                (natAddShuffle c d (mul p c) (mul q d))
+                (trans0 Nat (add (add c d) (add (mul p d) (mul q c)))
+                  (add (add d c) (add (mul p d) (mul q c)))
+                  (add (add d (mul p d)) (add c (mul q c)))
+                  (cong0 Nat Nat (add c d) (add d c) (fun z => add z (add (mul p d) (mul q c)))
+                    (addComm c d))
+                  (natAddShuffle d c (mul p d) (mul q c)))))
+        end
+    end
+
+def intAddComm : (a : Int) -> (b : Int) -> Eq Int (intAdd a b) (intAdd b a) :=
+  fun a b => match a as x return Eq Int (intAdd x b) (intAdd b x) with
+    | pos m => match b as y return Eq Int (intAdd (pos m) y) (intAdd y (pos m)) with
+        | pos n => cong0 Nat Int (add m n) (add n m) pos (addComm m n)
+        | negsucc n => refl Int (intMk m (succ n))
+        end
+    | negsucc m => match b as y return Eq Int (intAdd (negsucc m) y) (intAdd y (negsucc m)) with
+        | pos n => refl Int (intMk n (succ m))
+        | negsucc n => cong0 Nat Int (add m n) (add n m) (fun z => negsucc (succ z)) (addComm m n)
+        end
+    end
+
+def intAddAssocCore : (a : Nat) -> (b : Nat) -> (c : Nat) -> (d : Nat) -> (e : Nat) -> (f : Nat) ->
+    Eq Int (intAdd (intAdd (intMk a b) (intMk c d)) (intMk e f))
+      (intAdd (intMk a b) (intAdd (intMk c d) (intMk e f))) :=
+  fun a b c d e f =>
+    trans0 Int
+      (intAdd (intAdd (intMk a b) (intMk c d)) (intMk e f))
+      (intMk (add (add a c) e) (add (add b d) f))
+      (intAdd (intMk a b) (intAdd (intMk c d) (intMk e f)))
+      (trans0 Int
+        (intAdd (intAdd (intMk a b) (intMk c d)) (intMk e f))
+        (intAdd (intMk (add a c) (add b d)) (intMk e f))
+        (intMk (add (add a c) e) (add (add b d) f))
+        (cong0 Int Int (intAdd (intMk a b) (intMk c d)) (intMk (add a c) (add b d))
+          (fun z => intAdd z (intMk e f)) (intAddMk a b c d))
+        (intAddMk (add a c) (add b d) e f))
+      (sym0 Int
+        (intAdd (intMk a b) (intAdd (intMk c d) (intMk e f)))
+        (intMk (add (add a c) e) (add (add b d) f))
+        (trans0 Int
+          (intAdd (intMk a b) (intAdd (intMk c d) (intMk e f)))
+          (intAdd (intMk a b) (intMk (add c e) (add d f)))
+          (intMk (add (add a c) e) (add (add b d) f))
+          (cong0 Int Int (intAdd (intMk c d) (intMk e f)) (intMk (add c e) (add d f))
+            (fun z => intAdd (intMk a b) z) (intAddMk c d e f))
+          (trans0 Int
+            (intAdd (intMk a b) (intMk (add c e) (add d f)))
+            (intMk (add a (add c e)) (add b (add d f)))
+            (intMk (add (add a c) e) (add (add b d) f))
+            (intAddMk a b (add c e) (add d f))
+            (intMkCong2 (add a (add c e)) (add b (add d f))
+              (add (add a c) e) (add (add b d) f)
+              (sym0 Nat (add (add a c) e) (add a (add c e)) (addAssoc a c e))
+              (sym0 Nat (add (add b d) f) (add b (add d f)) (addAssoc b d f))))))
+
+def intAddAssoc : (x : Int) -> (y : Int) -> (z : Int) ->
+    Eq Int (intAdd (intAdd x y) z) (intAdd x (intAdd y z)) :=
+  fun x y z =>
+    match intReprOf x as rx return Eq Int (intAdd (intAdd x y) z) (intAdd x (intAdd y z)) with
+    | intRepr a b e =>
+        match intReprOf y as ry return Eq Int (intAdd (intAdd x y) z) (intAdd x (intAdd y z)) with
+        | intRepr c d f =>
+            match intReprOf z as rz return Eq Int (intAdd (intAdd x y) z) (intAdd x (intAdd y z)) with
+            | intRepr g h k =>
+                subst0 Int (intMk a b) x
+                  (fun w => Eq Int (intAdd (intAdd w y) z) (intAdd w (intAdd y z))) e
+                  (subst0 Int (intMk c d) y
+                    (fun w => Eq Int (intAdd (intAdd (intMk a b) w) z)
+                      (intAdd (intMk a b) (intAdd w z))) f
+                    (subst0 Int (intMk g h) z
+                      (fun w => Eq Int (intAdd (intAdd (intMk a b) (intMk c d)) w)
+                        (intAdd (intMk a b) (intAdd (intMk c d) w))) k
+                      (intAddAssocCore a b c d g h)))
+            end
+        end
+    end
+
+def intAddZero : (a : Int) -> Eq Int (intAdd a intZero) a :=
+  fun a => match a as x return Eq Int (intAdd x intZero) x with
+    | pos m => cong0 Nat Int (add m zero) m pos (addZero m)
+    | negsucc m => refl Int (negsucc m)
+    end
+
+def intAddNegCancel : (a : Int) -> Eq Int (intAdd a (intNeg a)) intZero :=
+  fun a => match a as x return Eq Int (intAdd x (intNeg x)) intZero with
+    | pos m => match m as y return Eq Int (intAdd (pos y) (intNeg (pos y))) intZero with
+        | zero => refl Int (pos zero)
+        | succ n => intMkDiag n
+        end
+    | negsucc m => intMkDiag m
+    end
+
+def intNegAddCancel : (k : Int) -> Eq Int (intAdd (intNeg k) k) intZero :=
+  fun k =>
+    trans0 Int (intAdd (intNeg k) k) (intAdd k (intNeg k)) intZero
+      (intAddComm (intNeg k) k)
+      (intAddNegCancel k)
+
+def intAddCancelLeft : (k : Int) -> (x : Int) -> (y : Int) ->
+    (h : Eq Int (intAdd k x) (intAdd k y)) -> Eq Int x y :=
+  fun k x y h =>
+    trans0 Int x (intAdd (pos zero) x) y
+      (sym0 Int (intAdd (pos zero) x) x (intAddZeroLeft x))
+      (trans0 Int (intAdd (pos zero) x) (intAdd (intAdd (intNeg k) k) x) y
+        (cong0 Int Int (pos zero) (intAdd (intNeg k) k) (fun z => intAdd z x)
+          (sym0 Int (intAdd (intNeg k) k) (pos zero) (intNegAddCancel k)))
+        (trans0 Int (intAdd (intAdd (intNeg k) k) x) (intAdd (intNeg k) (intAdd k x)) y
+          (intAddAssoc (intNeg k) k x)
+          (trans0 Int (intAdd (intNeg k) (intAdd k x)) (intAdd (intNeg k) (intAdd k y)) y
+            (cong0 Int Int (intAdd k x) (intAdd k y) (fun z => intAdd (intNeg k) z) h)
+            (trans0 Int (intAdd (intNeg k) (intAdd k y)) (intAdd (intAdd (intNeg k) k) y) y
+              (sym0 Int (intAdd (intAdd (intNeg k) k) y) (intAdd (intNeg k) (intAdd k y))
+                (intAddAssoc (intNeg k) k y))
+              (trans0 Int (intAdd (intAdd (intNeg k) k) y) (intAdd (pos zero) y) y
+                (cong0 Int Int (intAdd (intNeg k) k) (pos zero) (fun z => intAdd z y)
+                  (intNegAddCancel k))
+                (intAddZeroLeft y))))))
+
+def intMulCommCore : (a : Nat) -> (b : Nat) -> (c : Nat) -> (d : Nat) ->
+    Eq Int (intMul (intMk a b) (intMk c d)) (intMul (intMk c d) (intMk a b)) :=
+  fun a b c d =>
+    trans0 Int
+      (intMul (intMk a b) (intMk c d))
+      (intMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c)))
+      (intMul (intMk c d) (intMk a b))
+      (intMulMk a b c d)
+      (trans0 Int
+        (intMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c)))
+        (intMk (add (mul c a) (mul d b)) (add (mul c b) (mul d a)))
+        (intMul (intMk c d) (intMk a b))
+        (intMkCong2 (add (mul a c) (mul b d)) (add (mul a d) (mul b c))
+          (add (mul c a) (mul d b)) (add (mul c b) (mul d a))
+          (trans0 Nat (add (mul a c) (mul b d)) (add (mul c a) (mul b d))
+            (add (mul c a) (mul d b))
+            (cong0 Nat Nat (mul a c) (mul c a) (fun z => add z (mul b d)) (mulComm a c))
+            (cong0 Nat Nat (mul b d) (mul d b) (fun z => add (mul c a) z) (mulComm b d)))
+          (trans0 Nat (add (mul a d) (mul b c)) (add (mul b c) (mul a d))
+            (add (mul c b) (mul d a))
+            (addComm (mul a d) (mul b c))
+            (trans0 Nat (add (mul b c) (mul a d)) (add (mul c b) (mul a d))
+              (add (mul c b) (mul d a))
+              (cong0 Nat Nat (mul b c) (mul c b) (fun z => add z (mul a d)) (mulComm b c))
+              (cong0 Nat Nat (mul a d) (mul d a) (fun z => add (mul c b) z) (mulComm a d)))))
+        (sym0 Int (intMul (intMk c d) (intMk a b))
+          (intMk (add (mul c a) (mul d b)) (add (mul c b) (mul d a)))
+          (intMulMk c d a b)))
+
+def intMulComm : (x : Int) -> (y : Int) -> Eq Int (intMul x y) (intMul y x) :=
+  fun x y =>
+    match intReprOf x as rx return Eq Int (intMul x y) (intMul y x) with
+    | intRepr a b e =>
+        match intReprOf y as ry return Eq Int (intMul x y) (intMul y x) with
+        | intRepr c d f =>
+            subst0 Int (intMk a b) x (fun w => Eq Int (intMul w y) (intMul y w)) e
+              (subst0 Int (intMk c d) y
+                (fun w => Eq Int (intMul (intMk a b) w) (intMul w (intMk a b))) f
+                (intMulCommCore a b c d))
+        end
+    end
+
+def natMulAssocCross : (a : Nat) -> (b : Nat) -> (c : Nat) -> (d : Nat) -> (e : Nat) -> (f : Nat) ->
+    Eq Nat (add (mul (add (mul a c) (mul b d)) e) (mul (add (mul a d) (mul b c)) f))
+      (add (mul a (add (mul c e) (mul d f))) (mul b (add (mul c f) (mul d e)))) :=
+  fun a b c d e f =>
+    trans0 Nat
+      (add (mul (add (mul a c) (mul b d)) e) (mul (add (mul a d) (mul b c)) f))
+      (add (add (mul (mul a c) e) (mul (mul b d) e)) (mul (add (mul a d) (mul b c)) f))
+      (add (mul a (add (mul c e) (mul d f))) (mul b (add (mul c f) (mul d e))))
+      (cong0 Nat Nat (mul (add (mul a c) (mul b d)) e)
+        (add (mul (mul a c) e) (mul (mul b d) e))
+        (fun z => add z (mul (add (mul a d) (mul b c)) f))
+        (addMulRight (mul a c) (mul b d) e))
+      (trans0 Nat
+        (add (add (mul (mul a c) e) (mul (mul b d) e)) (mul (add (mul a d) (mul b c)) f))
+        (add (add (mul (mul a c) e) (mul (mul b d) e)) (add (mul (mul a d) f) (mul (mul b c) f)))
+        (add (mul a (add (mul c e) (mul d f))) (mul b (add (mul c f) (mul d e))))
+        (cong0 Nat Nat (mul (add (mul a d) (mul b c)) f)
+          (add (mul (mul a d) f) (mul (mul b c) f))
+          (fun z => add (add (mul (mul a c) e) (mul (mul b d) e)) z)
+          (addMulRight (mul a d) (mul b c) f))
+        (trans0 Nat
+          (add (add (mul (mul a c) e) (mul (mul b d) e)) (add (mul (mul a d) f) (mul (mul b c) f)))
+          (add (add (mul a (mul c e)) (mul (mul b d) e)) (add (mul (mul a d) f) (mul (mul b c) f)))
+          (add (mul a (add (mul c e) (mul d f))) (mul b (add (mul c f) (mul d e))))
+          (cong0 Nat Nat (mul (mul a c) e) (mul a (mul c e))
+            (fun z => add (add z (mul (mul b d) e)) (add (mul (mul a d) f) (mul (mul b c) f)))
+            (mulAssoc a c e))
+          (trans0 Nat
+            (add (add (mul a (mul c e)) (mul (mul b d) e)) (add (mul (mul a d) f) (mul (mul b c) f)))
+            (add (add (mul a (mul c e)) (mul b (mul d e))) (add (mul (mul a d) f) (mul (mul b c) f)))
+            (add (mul a (add (mul c e) (mul d f))) (mul b (add (mul c f) (mul d e))))
+            (cong0 Nat Nat (mul (mul b d) e) (mul b (mul d e))
+              (fun z => add (add (mul a (mul c e)) z) (add (mul (mul a d) f) (mul (mul b c) f)))
+              (mulAssoc b d e))
+            (trans0 Nat
+              (add (add (mul a (mul c e)) (mul b (mul d e))) (add (mul (mul a d) f) (mul (mul b c) f)))
+              (add (add (mul a (mul c e)) (mul b (mul d e))) (add (mul a (mul d f)) (mul (mul b c) f)))
+              (add (mul a (add (mul c e) (mul d f))) (mul b (add (mul c f) (mul d e))))
+              (cong0 Nat Nat (mul (mul a d) f) (mul a (mul d f))
+                (fun z => add (add (mul a (mul c e)) (mul b (mul d e))) (add z (mul (mul b c) f)))
+                (mulAssoc a d f))
+              (trans0 Nat
+                (add (add (mul a (mul c e)) (mul b (mul d e))) (add (mul a (mul d f)) (mul (mul b c) f)))
+                (add (add (mul a (mul c e)) (mul b (mul d e))) (add (mul a (mul d f)) (mul b (mul c f))))
+                (add (mul a (add (mul c e) (mul d f))) (mul b (add (mul c f) (mul d e))))
+                (cong0 Nat Nat (mul (mul b c) f) (mul b (mul c f))
+                  (fun z => add (add (mul a (mul c e)) (mul b (mul d e))) (add (mul a (mul d f)) z))
+                  (mulAssoc b c f))
+                (trans0 Nat
+                  (add (add (mul a (mul c e)) (mul b (mul d e))) (add (mul a (mul d f)) (mul b (mul c f))))
+                  (add (add (mul a (mul c e)) (mul a (mul d f))) (add (mul b (mul d e)) (mul b (mul c f))))
+                  (add (mul a (add (mul c e) (mul d f))) (mul b (add (mul c f) (mul d e))))
+                  (natAddShuffle (mul a (mul c e)) (mul b (mul d e)) (mul a (mul d f)) (mul b (mul c f)))
+                  (trans0 Nat
+                    (add (add (mul a (mul c e)) (mul a (mul d f))) (add (mul b (mul d e)) (mul b (mul c f))))
+                    (add (add (mul a (mul c e)) (mul a (mul d f))) (add (mul b (mul c f)) (mul b (mul d e))))
+                    (add (mul a (add (mul c e) (mul d f))) (mul b (add (mul c f) (mul d e))))
+                    (cong0 Nat Nat (add (mul b (mul d e)) (mul b (mul c f)))
+                      (add (mul b (mul c f)) (mul b (mul d e)))
+                      (fun z => add (add (mul a (mul c e)) (mul a (mul d f))) z)
+                      (addComm (mul b (mul d e)) (mul b (mul c f))))
+                    (trans0 Nat
+                      (add (add (mul a (mul c e)) (mul a (mul d f))) (add (mul b (mul c f)) (mul b (mul d e))))
+                      (add (mul a (add (mul c e) (mul d f))) (add (mul b (mul c f)) (mul b (mul d e))))
+                      (add (mul a (add (mul c e) (mul d f))) (mul b (add (mul c f) (mul d e))))
+                      (cong0 Nat Nat (add (mul a (mul c e)) (mul a (mul d f)))
+                        (mul a (add (mul c e) (mul d f)))
+                        (fun z => add z (add (mul b (mul c f)) (mul b (mul d e))))
+                        (sym0 Nat (mul a (add (mul c e) (mul d f)))
+                          (add (mul a (mul c e)) (mul a (mul d f)))
+                          (mulAdd a (mul c e) (mul d f))))
+                      (cong0 Nat Nat (add (mul b (mul c f)) (mul b (mul d e)))
+                        (mul b (add (mul c f) (mul d e)))
+                        (fun z => add (mul a (add (mul c e) (mul d f))) z)
+                        (sym0 Nat (mul b (add (mul c f) (mul d e)))
+                          (add (mul b (mul c f)) (mul b (mul d e)))
+                          (mulAdd b (mul c f) (mul d e))))))))))))
+
+def intMulAssocCore : (a : Nat) -> (b : Nat) -> (c : Nat) -> (d : Nat) -> (e : Nat) -> (f : Nat) ->
+    Eq Int (intMul (intMul (intMk a b) (intMk c d)) (intMk e f))
+      (intMul (intMk a b) (intMul (intMk c d) (intMk e f))) :=
+  fun a b c d e f =>
+    trans0 Int
+      (intMul (intMul (intMk a b) (intMk c d)) (intMk e f))
+      (intMul (intMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c))) (intMk e f))
+      (intMul (intMk a b) (intMul (intMk c d) (intMk e f)))
+      (cong0 Int Int (intMul (intMk a b) (intMk c d))
+        (intMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c)))
+        (fun z => intMul z (intMk e f))
+        (intMulMk a b c d))
+      (trans0 Int
+        (intMul (intMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c))) (intMk e f))
+        (intMk (add (mul (add (mul a c) (mul b d)) e) (mul (add (mul a d) (mul b c)) f))
+          (add (mul (add (mul a c) (mul b d)) f) (mul (add (mul a d) (mul b c)) e)))
+        (intMul (intMk a b) (intMul (intMk c d) (intMk e f)))
+        (intMulMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c)) e f)
+        (trans0 Int
+          (intMk (add (mul (add (mul a c) (mul b d)) e) (mul (add (mul a d) (mul b c)) f))
+            (add (mul (add (mul a c) (mul b d)) f) (mul (add (mul a d) (mul b c)) e)))
+          (intMk (add (mul a (add (mul c e) (mul d f))) (mul b (add (mul c f) (mul d e))))
+            (add (mul a (add (mul c f) (mul d e))) (mul b (add (mul c e) (mul d f)))))
+          (intMul (intMk a b) (intMul (intMk c d) (intMk e f)))
+          (intMkCong2
+            (add (mul (add (mul a c) (mul b d)) e) (mul (add (mul a d) (mul b c)) f))
+            (add (mul (add (mul a c) (mul b d)) f) (mul (add (mul a d) (mul b c)) e))
+            (add (mul a (add (mul c e) (mul d f))) (mul b (add (mul c f) (mul d e))))
+            (add (mul a (add (mul c f) (mul d e))) (mul b (add (mul c e) (mul d f))))
+            (natMulAssocCross a b c d e f)
+            (natMulAssocCross a b c d f e))
+          (trans0 Int
+            (intMk (add (mul a (add (mul c e) (mul d f))) (mul b (add (mul c f) (mul d e))))
+              (add (mul a (add (mul c f) (mul d e))) (mul b (add (mul c e) (mul d f)))))
+            (intMul (intMk a b) (intMk (add (mul c e) (mul d f)) (add (mul c f) (mul d e))))
+            (intMul (intMk a b) (intMul (intMk c d) (intMk e f)))
+            (sym0 Int
+              (intMul (intMk a b) (intMk (add (mul c e) (mul d f)) (add (mul c f) (mul d e))))
+              (intMk (add (mul a (add (mul c e) (mul d f))) (mul b (add (mul c f) (mul d e))))
+                (add (mul a (add (mul c f) (mul d e))) (mul b (add (mul c e) (mul d f)))))
+              (intMulMk a b (add (mul c e) (mul d f)) (add (mul c f) (mul d e))))
+            (cong0 Int Int (intMk (add (mul c e) (mul d f)) (add (mul c f) (mul d e)))
+              (intMul (intMk c d) (intMk e f))
+              (fun z => intMul (intMk a b) z)
+              (sym0 Int (intMul (intMk c d) (intMk e f))
+                (intMk (add (mul c e) (mul d f)) (add (mul c f) (mul d e)))
+                (intMulMk c d e f))))))
+
+def intMulAssoc : (x : Int) -> (y : Int) -> (z : Int) ->
+    Eq Int (intMul (intMul x y) z) (intMul x (intMul y z)) :=
+  fun x y z =>
+    match intReprOf x as rx return Eq Int (intMul (intMul x y) z) (intMul x (intMul y z)) with
+    | intRepr a b e =>
+        match intReprOf y as ry return Eq Int (intMul (intMul x y) z) (intMul x (intMul y z)) with
+        | intRepr c d f =>
+            match intReprOf z as rz return Eq Int (intMul (intMul x y) z) (intMul x (intMul y z)) with
+            | intRepr g h k =>
+                subst0 Int (intMk a b) x
+                  (fun w => Eq Int (intMul (intMul w y) z) (intMul w (intMul y z))) e
+                  (subst0 Int (intMk c d) y
+                    (fun w => Eq Int (intMul (intMul (intMk a b) w) z)
+                      (intMul (intMk a b) (intMul w z))) f
+                    (subst0 Int (intMk g h) z
+                      (fun w => Eq Int (intMul (intMul (intMk a b) (intMk c d)) w)
+                        (intMul (intMk a b) (intMul (intMk c d) w))) k
+                      (intMulAssocCore a b c d g h)))
+            end
+        end
+    end
+
+def natMulAddShuffle : (a : Nat) -> (b : Nat) -> (c : Nat) -> (d : Nat) -> (e : Nat) -> (f : Nat) ->
+    Eq Nat (add (mul a (add c e)) (mul b (add d f)))
+      (add (add (mul a c) (mul b d)) (add (mul a e) (mul b f))) :=
+  fun a b c d e f =>
+    trans0 Nat
+      (add (mul a (add c e)) (mul b (add d f)))
+      (add (add (mul a c) (mul a e)) (mul b (add d f)))
+      (add (add (mul a c) (mul b d)) (add (mul a e) (mul b f)))
+      (cong0 Nat Nat (mul a (add c e)) (add (mul a c) (mul a e))
+        (fun z => add z (mul b (add d f)))
+        (mulAdd a c e))
+      (trans0 Nat
+        (add (add (mul a c) (mul a e)) (mul b (add d f)))
+        (add (add (mul a c) (mul a e)) (add (mul b d) (mul b f)))
+        (add (add (mul a c) (mul b d)) (add (mul a e) (mul b f)))
+        (cong0 Nat Nat (mul b (add d f)) (add (mul b d) (mul b f))
+          (fun z => add (add (mul a c) (mul a e)) z)
+          (mulAdd b d f))
+        (natAddShuffle (mul a c) (mul a e) (mul b d) (mul b f)))
+
+def intMulAddCore : (a : Nat) -> (b : Nat) -> (c : Nat) -> (d : Nat) -> (e : Nat) -> (f : Nat) ->
+    Eq Int (intMul (intMk a b) (intAdd (intMk c d) (intMk e f)))
+      (intAdd (intMul (intMk a b) (intMk c d)) (intMul (intMk a b) (intMk e f))) :=
+  fun a b c d e f =>
+    trans0 Int
+      (intMul (intMk a b) (intAdd (intMk c d) (intMk e f)))
+      (intMul (intMk a b) (intMk (add c e) (add d f)))
+      (intAdd (intMul (intMk a b) (intMk c d)) (intMul (intMk a b) (intMk e f)))
+      (cong0 Int Int (intAdd (intMk c d) (intMk e f)) (intMk (add c e) (add d f))
+        (fun z => intMul (intMk a b) z)
+        (intAddMk c d e f))
+      (trans0 Int
+        (intMul (intMk a b) (intMk (add c e) (add d f)))
+        (intMk (add (mul a (add c e)) (mul b (add d f)))
+          (add (mul a (add d f)) (mul b (add c e))))
+        (intAdd (intMul (intMk a b) (intMk c d)) (intMul (intMk a b) (intMk e f)))
+        (intMulMk a b (add c e) (add d f))
+        (trans0 Int
+          (intMk (add (mul a (add c e)) (mul b (add d f)))
+            (add (mul a (add d f)) (mul b (add c e))))
+          (intMk (add (add (mul a c) (mul b d)) (add (mul a e) (mul b f)))
+            (add (add (mul a d) (mul b c)) (add (mul a f) (mul b e))))
+          (intAdd (intMul (intMk a b) (intMk c d)) (intMul (intMk a b) (intMk e f)))
+          (intMkCong2
+            (add (mul a (add c e)) (mul b (add d f)))
+            (add (mul a (add d f)) (mul b (add c e)))
+            (add (add (mul a c) (mul b d)) (add (mul a e) (mul b f)))
+            (add (add (mul a d) (mul b c)) (add (mul a f) (mul b e)))
+            (natMulAddShuffle a b c d e f)
+            (natMulAddShuffle a b d c f e))
+          (trans0 Int
+            (intMk (add (add (mul a c) (mul b d)) (add (mul a e) (mul b f)))
+              (add (add (mul a d) (mul b c)) (add (mul a f) (mul b e))))
+            (intAdd (intMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c)))
+              (intMk (add (mul a e) (mul b f)) (add (mul a f) (mul b e))))
+            (intAdd (intMul (intMk a b) (intMk c d)) (intMul (intMk a b) (intMk e f)))
+            (sym0 Int
+              (intAdd (intMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c)))
+                (intMk (add (mul a e) (mul b f)) (add (mul a f) (mul b e))))
+              (intMk (add (add (mul a c) (mul b d)) (add (mul a e) (mul b f)))
+                (add (add (mul a d) (mul b c)) (add (mul a f) (mul b e))))
+              (intAddMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c))
+                (add (mul a e) (mul b f)) (add (mul a f) (mul b e))))
+            (trans0 Int
+              (intAdd (intMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c)))
+                (intMk (add (mul a e) (mul b f)) (add (mul a f) (mul b e))))
+              (intAdd (intMul (intMk a b) (intMk c d))
+                (intMk (add (mul a e) (mul b f)) (add (mul a f) (mul b e))))
+              (intAdd (intMul (intMk a b) (intMk c d)) (intMul (intMk a b) (intMk e f)))
+              (cong0 Int Int (intMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c)))
+                (intMul (intMk a b) (intMk c d))
+                (fun z => intAdd z (intMk (add (mul a e) (mul b f)) (add (mul a f) (mul b e))))
+                (sym0 Int (intMul (intMk a b) (intMk c d))
+                  (intMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c)))
+                  (intMulMk a b c d)))
+              (cong0 Int Int (intMk (add (mul a e) (mul b f)) (add (mul a f) (mul b e)))
+                (intMul (intMk a b) (intMk e f))
+                (fun z => intAdd (intMul (intMk a b) (intMk c d)) z)
+                (sym0 Int (intMul (intMk a b) (intMk e f))
+                  (intMk (add (mul a e) (mul b f)) (add (mul a f) (mul b e)))
+                  (intMulMk a b e f)))))))
+
+def intMulAdd : (x : Int) -> (y : Int) -> (z : Int) ->
+    Eq Int (intMul x (intAdd y z)) (intAdd (intMul x y) (intMul x z)) :=
+  fun x y z =>
+    match intReprOf x as rx return
+        Eq Int (intMul x (intAdd y z)) (intAdd (intMul x y) (intMul x z)) with
+    | intRepr a b e =>
+        match intReprOf y as ry return
+            Eq Int (intMul x (intAdd y z)) (intAdd (intMul x y) (intMul x z)) with
+        | intRepr c d f =>
+            match intReprOf z as rz return
+                Eq Int (intMul x (intAdd y z)) (intAdd (intMul x y) (intMul x z)) with
+            | intRepr g h k =>
+                subst0 Int (intMk a b) x
+                  (fun w => Eq Int (intMul w (intAdd y z)) (intAdd (intMul w y) (intMul w z))) e
+                  (subst0 Int (intMk c d) y
+                    (fun w => Eq Int (intMul (intMk a b) (intAdd w z))
+                      (intAdd (intMul (intMk a b) w) (intMul (intMk a b) z))) f
+                    (subst0 Int (intMk g h) z
+                      (fun w => Eq Int (intMul (intMk a b) (intAdd (intMk c d) w))
+                        (intAdd (intMul (intMk a b) (intMk c d)) (intMul (intMk a b) w))) k
+                      (intMulAddCore a b c d g h)))
+            end
+        end
+    end
+
+def intMulOne : (a : Int) -> Eq Int (intMul a intOne) a :=
+  fun a => match a as x return Eq Int (intMul x intOne) x with
+    | pos m => cong0 Nat Int (mul m one) m pos (mulOne m)
+    | negsucc m => cong0 Nat Int (mul (succ m) one) (succ m) negOfNat (mulOne (succ m))
+    end
+
+def intMulZero : (a : Int) -> Eq Int (intMul a intZero) intZero :=
+  fun a => match a as x return Eq Int (intMul x intZero) intZero with
+    | pos m => cong0 Nat Int (mul m zero) zero pos (mulZeroRight m)
+    | negsucc m => cong0 Nat Int (mul (succ m) zero) zero negOfNat (mulZeroRight (succ m))
+    end
+
+def intMulNegCore : (a : Nat) -> (b : Nat) -> (c : Nat) -> (d : Nat) ->
+    Eq Int (intMul (intMk a b) (intNeg (intMk c d)))
+      (intNeg (intMul (intMk a b) (intMk c d))) :=
+  fun a b c d =>
+    trans0 Int
+      (intMul (intMk a b) (intNeg (intMk c d)))
+      (intMul (intMk a b) (intMk d c))
+      (intNeg (intMul (intMk a b) (intMk c d)))
+      (cong0 Int Int (intNeg (intMk c d)) (intMk d c)
+        (fun z => intMul (intMk a b) z)
+        (intNegMk c d))
+      (trans0 Int
+        (intMul (intMk a b) (intMk d c))
+        (intMk (add (mul a d) (mul b c)) (add (mul a c) (mul b d)))
+        (intNeg (intMul (intMk a b) (intMk c d)))
+        (intMulMk a b d c)
+        (sym0 Int
+          (intNeg (intMul (intMk a b) (intMk c d)))
+          (intMk (add (mul a d) (mul b c)) (add (mul a c) (mul b d)))
+          (trans0 Int
+            (intNeg (intMul (intMk a b) (intMk c d)))
+            (intNeg (intMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c))))
+            (intMk (add (mul a d) (mul b c)) (add (mul a c) (mul b d)))
+            (cong0 Int Int (intMul (intMk a b) (intMk c d))
+              (intMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c)))
+              intNeg
+              (intMulMk a b c d))
+            (intNegMk (add (mul a c) (mul b d)) (add (mul a d) (mul b c))))))
+
+def intMulNeg : (k : Int) -> (y : Int) -> Eq Int (intMul k (intNeg y)) (intNeg (intMul k y)) :=
+  fun k y =>
+    match intReprOf k as rk return Eq Int (intMul k (intNeg y)) (intNeg (intMul k y)) with
+    | intRepr a b e =>
+        match intReprOf y as ry return Eq Int (intMul k (intNeg y)) (intNeg (intMul k y)) with
+        | intRepr c d f =>
+            subst0 Int (intMk a b) k
+              (fun w => Eq Int (intMul w (intNeg y)) (intNeg (intMul w y))) e
+              (subst0 Int (intMk c d) y
+                (fun w => Eq Int (intMul (intMk a b) (intNeg w))
+                  (intNeg (intMul (intMk a b) w))) f
+                (intMulNegCore a b c d))
+        end
+    end
+
+data IntLt (0 a : Int) (0 b : Int) : Type 0 :=
+  | intLtWitness : (0 k : Nat) -> (0 e : Eq Int (intAdd a (pos (succ k))) b) -> IntLt a b
+
+reducible def intLt : Int -> Int -> Type 0 := fun a b => IntLt a b
+
+def intLtIrrefl : (a : Int) -> (0 h : intLt a a) -> Empty :=
+  fun a h => match h as w return Empty with
+    | intLtWitness k e =>
+        zeroNotSucc k
+          (sym0 Nat (succ k) zero
+            (posInj (succ k) zero
+              (intAddCancelLeft a (pos (succ k)) (pos zero)
+                (trans0 Int (intAdd a (pos (succ k))) a (intAdd a (pos zero))
+                  e
+                  (sym0 Int (intAdd a (pos zero)) a (intAddZero a))))))
+    end
+
+def intLtTrans : (a : Int) -> (b : Int) -> (c : Int) ->
+    (0 h1 : intLt a b) -> (0 h2 : intLt b c) -> intLt a c :=
+  fun a b c h1 h2 => match h1 as w1 return intLt a c with
+    | intLtWitness k1 e1 =>
+        match h2 as w2 return intLt a c with
+        | intLtWitness k2 e2 =>
+            intLtWitness a c (add k1 (succ k2))
+              (trans0 Int (intAdd a (pos (succ (add k1 (succ k2)))))
+                (intAdd (intAdd a (pos (succ k1))) (pos (succ k2))) c
+                (sym0 Int (intAdd (intAdd a (pos (succ k1))) (pos (succ k2)))
+                  (intAdd a (pos (succ (add k1 (succ k2)))))
+                  (intAddAssoc a (pos (succ k1)) (pos (succ k2))))
+                (trans0 Int (intAdd (intAdd a (pos (succ k1))) (pos (succ k2)))
+                  (intAdd b (pos (succ k2))) c
+                  (cong0 Int Int (intAdd a (pos (succ k1))) b
+                    (fun z => intAdd z (pos (succ k2))) e1)
+                  e2))
+        end
+    end
+
+def intAddLtAddLeft : (a : Int) -> (b : Int) -> (c : Int) ->
+    (0 h : intLt b c) -> intLt (intAdd a b) (intAdd a c) :=
+  fun a b c h => match h as w return intLt (intAdd a b) (intAdd a c) with
+    | intLtWitness k e =>
+        intLtWitness (intAdd a b) (intAdd a c) k
+          (trans0 Int (intAdd (intAdd a b) (pos (succ k)))
+            (intAdd a (intAdd b (pos (succ k)))) (intAdd a c)
+            (intAddAssoc a b (pos (succ k)))
+            (cong0 Int Int (intAdd b (pos (succ k))) c (fun z => intAdd a z) e))
+    end
+
+def intMulPos : (a : Int) -> (b : Int) ->
+    (0 ha : intLt intZero a) -> (0 hb : intLt intZero b) -> intLt intZero (intMul a b) :=
+  fun a b ha hb => match ha as w1 return intLt intZero (intMul a b) with
+    | intLtWitness k1 e1 =>
+        match hb as w2 return intLt intZero (intMul a b) with
+        | intLtWitness k2 e2 =>
+            intLtWitness intZero (intMul a b) (add k2 (mul k1 (succ k2)))
+              (trans0 Int (intMul (pos (succ k1)) (pos (succ k2)))
+                (intMul a (pos (succ k2))) (intMul a b)
+                (cong0 Int Int (pos (succ k1)) a (fun z => intMul z (pos (succ k2))) e1)
+                (cong0 Int Int (pos (succ k2)) b (fun z => intMul a z) e2))
+        end
+    end
+
+def natAddRightComm : (a : Nat) -> (b : Nat) -> (c : Nat) ->
+    Eq Nat (add (add a b) c) (add (add a c) b) :=
+  fun a b c =>
+    trans0 Nat (add (add a b) c) (add a (add b c)) (add (add a c) b)
+      (addAssoc a b c)
+      (trans0 Nat (add a (add b c)) (add a (add c b)) (add (add a c) b)
+        (cong0 Nat Nat (add b c) (add c b) (fun z => add a z) (addComm b c))
+        (sym0 Nat (add (add a c) b) (add a (add c b)) (addAssoc a c b)))
+
+def intLtTrichotomyCore : (p : Nat) -> (q : Nat) -> (r : Nat) -> (s : Nat) ->
+    Trichotomy Int intLt (intMk p q) (intMk r s) :=
+  fun p q r s =>
+    match ltTrichotomy (add p s) (add r q) as t
+        return Trichotomy Int intLt (intMk p q) (intMk r s) with
+    | isLt h =>
+        match h as w return Trichotomy Int intLt (intMk p q) (intMk r s) with
+        | ltWitness k e =>
+            isLt Int intLt (intMk p q) (intMk r s)
+              (intLtWitness (intMk p q) (intMk r s) k
+                (trans0 Int (intAdd (intMk p q) (pos (succ k)))
+                  (intMk (add p (succ k)) (add q zero)) (intMk r s)
+                  (intAddMk p q (succ k) zero)
+                  (intMkEqOfAdd (add p (succ k)) (add q zero) r s
+                    (trans0 Nat (add (add p (succ k)) s) (add (add p s) (succ k))
+                      (add r (add q zero))
+                      (natAddRightComm p (succ k) s)
+                      (trans0 Nat (add (add p s) (succ k)) (add r q) (add r (add q zero))
+                        e
+                        (cong0 Nat Nat q (add q zero) (fun z => add r z)
+                          (sym0 Nat (add q zero) q (addZero q))))))))
+        end
+    | isEq e =>
+        isEq Int intLt (intMk p q) (intMk r s) (intMkEqOfAdd p q r s e)
+    | isGt h =>
+        match h as w return Trichotomy Int intLt (intMk p q) (intMk r s) with
+        | ltWitness k e =>
+            isGt Int intLt (intMk p q) (intMk r s)
+              (intLtWitness (intMk r s) (intMk p q) k
+                (trans0 Int (intAdd (intMk r s) (pos (succ k)))
+                  (intMk (add r (succ k)) (add s zero)) (intMk p q)
+                  (intAddMk r s (succ k) zero)
+                  (intMkEqOfAdd (add r (succ k)) (add s zero) p q
+                    (trans0 Nat (add (add r (succ k)) q) (add (add r q) (succ k))
+                      (add p (add s zero))
+                      (natAddRightComm r (succ k) q)
+                      (trans0 Nat (add (add r q) (succ k)) (add p s) (add p (add s zero))
+                        e
+                        (cong0 Nat Nat s (add s zero) (fun z => add p z)
+                          (sym0 Nat (add s zero) s (addZero s))))))))
+        end
+    end
+
+def intLtTrichotomy : (x : Int) -> (y : Int) -> Trichotomy Int intLt x y :=
+  fun x y =>
+    match intReprOf x as rx return Trichotomy Int intLt x y with
+    | intRepr a b e =>
+        match intReprOf y as ry return Trichotomy Int intLt x y with
+        | intRepr c d f =>
+            subst0 Int (intMk a b) x (fun w => Trichotomy Int intLt w y) e
+              (subst0 Int (intMk c d) y (fun w => Trichotomy Int intLt (intMk a b) w) f
+                (intLtTrichotomyCore a b c d))
+        end
+    end
+
+def intZeroNeOne : (0 e : Eq Int intZero intOne) -> Empty :=
+  fun e => zeroNeOne (posInj zero one e)
+
+def natAbsMul : (a : Int) -> (b : Int) ->
+    Eq Nat (natAbs (intMul a b)) (mul (natAbs a) (natAbs b)) :=
+  fun a b => match a as x return Eq Nat (natAbs (intMul x b)) (mul (natAbs x) (natAbs b)) with
+    | pos m =>
+        match b as y return Eq Nat (natAbs (intMul (pos m) y)) (mul m (natAbs y)) with
+        | pos n => refl Nat (mul m n)
+        | negsucc n => natAbsNegOfNat (mul m (succ n))
+        end
+    | negsucc m =>
+        match b as y return Eq Nat (natAbs (intMul (negsucc m) y)) (mul (succ m) (natAbs y)) with
+        | pos n => natAbsNegOfNat (mul (succ m) n)
+        | negsucc n => refl Nat (mul (succ m) (succ n))
+        end
+    end
+
+def natMulEqZeroRight : (m : Nat) -> (n : Nat) -> (hm : Eq Nat m zero -> Empty) ->
+    (h : Eq Nat (mul m n) zero) -> Eq Nat n zero :=
+  fun m n hm h =>
+    (match m as x return (hmx : Eq Nat x zero -> Empty) ->
+        (hx : Eq Nat (mul x n) zero) -> Eq Nat n zero with
+     | zero => fun hmz hz => match hmz (refl Nat zero) as w return Eq Nat n zero with end
+     | succ p => fun hms hs =>
+         (match n as y return (hy : Eq Nat (mul (succ p) y) zero) -> Eq Nat y zero with
+          | zero => fun hy => refl Nat zero
+          | succ q => fun hy =>
+              match zeroNotSucc (add q (mul p (succ q)))
+                  (sym0 Nat (mul (succ p) (succ q)) zero hy) as w
+                  return Eq Nat (succ q) zero with end
+          end) hs
+     end) hm h
+
+def intEqZeroOfNatAbs : (z : Int) -> (e : Eq Nat (natAbs z) zero) -> Eq Int z intZero :=
+  fun z e =>
+    (match z as x return (ex : Eq Nat (natAbs x) zero) -> Eq Int x intZero with
+     | pos n => fun en => cong0 Nat Int n zero pos en
+     | negsucc n => fun en =>
+         match zeroNotSucc n (sym0 Nat (succ n) zero en) as w
+             return Eq Int (negsucc n) intZero with end
+     end) e
+
+def intMulEqZeroRight : (k : Int) -> (z : Int) -> (hk : Eq Int k intZero -> Empty) ->
+    (h : Eq Int (intMul k z) intZero) -> Eq Int z intZero :=
+  fun k z hk h =>
+    intEqZeroOfNatAbs z
+      (natMulEqZeroRight (natAbs k) (natAbs z)
+        (fun e => hk (intEqZeroOfNatAbs k e))
+        (trans0 Nat (mul (natAbs k) (natAbs z)) (natAbs (intMul k z)) zero
+          (sym0 Nat (natAbs (intMul k z)) (mul (natAbs k) (natAbs z)) (natAbsMul k z))
+          (cong0 Int Nat (intMul k z) intZero natAbs h)))
+
+def intMulCancelLeft : (k : Int) -> (x : Int) -> (y : Int) ->
+    (hk : Eq Int k intZero -> Empty) ->
+    (h : Eq Int (intMul k x) (intMul k y)) -> Eq Int x y :=
+  fun k x y hk h =>
+    trans0 Int x (intAdd x intZero) y
+      (sym0 Int (intAdd x intZero) x (intAddZero x))
+      (trans0 Int (intAdd x intZero) (intAdd x (intAdd (intNeg y) y)) y
+        (cong0 Int Int intZero (intAdd (intNeg y) y) (fun w => intAdd x w)
+          (sym0 Int (intAdd (intNeg y) y) intZero (intNegAddCancel y)))
+        (trans0 Int (intAdd x (intAdd (intNeg y) y)) (intAdd (intAdd x (intNeg y)) y) y
+          (sym0 Int (intAdd (intAdd x (intNeg y)) y) (intAdd x (intAdd (intNeg y) y))
+            (intAddAssoc x (intNeg y) y))
+          (trans0 Int (intAdd (intAdd x (intNeg y)) y) (intAdd intZero y) y
+            (cong0 Int Int (intAdd x (intNeg y)) intZero (fun w => intAdd w y)
+              (intMulEqZeroRight k (intAdd x (intNeg y)) hk
+                (trans0 Int (intMul k (intAdd x (intNeg y)))
+                  (intAdd (intMul k x) (intMul k (intNeg y))) intZero
+                  (intMulAdd k x (intNeg y))
+                  (trans0 Int (intAdd (intMul k x) (intMul k (intNeg y)))
+                    (intAdd (intMul k y) (intMul k (intNeg y))) intZero
+                    (cong0 Int Int (intMul k x) (intMul k y)
+                      (fun w => intAdd w (intMul k (intNeg y))) h)
+                    (trans0 Int (intAdd (intMul k y) (intMul k (intNeg y)))
+                      (intAdd (intMul k y) (intNeg (intMul k y))) intZero
+                      (cong0 Int Int (intMul k (intNeg y)) (intNeg (intMul k y))
+                        (fun w => intAdd (intMul k y) w) (intMulNeg k y))
+                      (intAddNegCancel (intMul k y)))))))
+            (intAddZeroLeft y))))
+
+def intDecEq : (x : Int) -> (y : Int) -> Dec (Eq Int x y) :=
+  fun x y => match x as xx return Dec (Eq Int xx y) with
+    | pos m =>
+        match y as yy return Dec (Eq Int (pos m) yy) with
+        | pos n =>
+            match natDecEq m n as d return Dec (Eq Int (pos m) (pos n)) with
+            | yes p => yes (Eq Int (pos m) (pos n)) (cong0 Nat Int m n pos p)
+            | no np => no (Eq Int (pos m) (pos n)) (fun hh => np (posInj m n hh))
+            end
+        | negsucc n =>
+            no (Eq Int (pos m) (negsucc n)) (fun hh => posNeNegsucc m n hh)
+        end
+    | negsucc m =>
+        match y as yy return Dec (Eq Int (negsucc m) yy) with
+        | pos n =>
+            no (Eq Int (negsucc m) (pos n))
+              (fun hh => posNeNegsucc n m (sym0 Int (negsucc m) (pos n) hh))
+        | negsucc n =>
+            match natDecEq m n as d return Dec (Eq Int (negsucc m) (negsucc n)) with
+            | yes p => yes (Eq Int (negsucc m) (negsucc n)) (cong0 Nat Int m n negsucc p)
+            | no np => no (Eq Int (negsucc m) (negsucc n)) (fun hh => np (negsuccInj m n hh))
+            end
+        end
+    end
+
+check intZero
+check intOne
+check negOfNat
+check intMk
+check intNeg
+check intAdd
+check intMul
+check natAbs
+check intFamPos
+check posInj
+check negsuccInj
+check posNeNegsucc
+check natAbsNegOfNat
+check intMkPos
+check intMkNegsucc
+check intMkAddCancel
+check intMkCong2
+check intMkEqOfAdd
+check intMkDiag
+check intReprOf
+check intAddZeroLeft
+check intAddPosMk
+check intAddNegsuccMk
+check intAddMk
+check intNegMk
+check intMulZeroLeft
+check intMulPosMk
+check intMulNegsuccMk
+check natAddShuffle
+check intMulMk
+check intAddComm
+check intAddAssocCore
+check intAddAssoc
+check intAddZero
+check intAddNegCancel
+check intNegAddCancel
+check intAddCancelLeft
+check intMulCommCore
+check intMulComm
+check natMulAssocCross
+check intMulAssocCore
+check intMulAssoc
+check natMulAddShuffle
+check intMulAddCore
+check intMulAdd
+check intMulOne
+check intMulZero
+check intMulNegCore
+check intMulNeg
+check intLt
+check intLtIrrefl
+check intLtTrans
+check intAddLtAddLeft
+check intMulPos
+check natAddRightComm
+check intLtTrichotomyCore
+check intLtTrichotomy
+check intZeroNeOne
+check natAbsMul
+check natMulEqZeroRight
+check intEqZeroOfNatAbs
+check intMulEqZeroRight
+check intMulCancelLeft
+check intDecEq

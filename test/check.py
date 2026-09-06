@@ -13,7 +13,7 @@ DEFAULT_TOT = Path("/Users/oobi/Documents/kan-lang-tot-pin/"
 TOT = Path(os.environ.get("TOT", DEFAULT_TOT))
 NAMES = ["Foundation", "Field", "Invariant", "Axioms", "Ring", "Laws",
          "Compose", "Frac", "Order", "Pool", "Basic", "Product", "NoDrain",
-         "PriceImpact", "Liquidity", "Nat"]
+         "PriceImpact", "Liquidity", "Nat", "Int"]
 FILES = {name: (ROOT / "src" / f"{name}.tot").read_text() for name in NAMES}
 FIELD = FILES["Field"]
 INVARIANT = FILES["Invariant"]
@@ -689,11 +689,114 @@ NAT_NEGATIVES = [
      "(m : Nat) -> (n : Nat) -> Dec (Eq Nat n m) :="),
 ]
 
+# The twenty five result-type negatives of src/Int.tot that M4b adds:
+# (case, def, old, new). Every case changes the result type of one
+# theorem and keeps its proof, so the first failing def is the mutated
+# def itself. Every anchor is the last line of the def header, the one
+# that ends in the trailing ":=", so the count stays 1 and no step of
+# the body changes.
+INT_NEGATIVES = [
+    ("wrong-int-pos-inj", "posInj",
+     "def posInj : (0 m : Nat) -> (0 n : Nat) -> (0 h : Eq Int (pos m) (pos n)) -> Eq Nat m n :=",
+     "def posInj : (0 m : Nat) -> (0 n : Nat) -> (0 h : Eq Int (pos m) (pos n)) -> Eq Nat n m :="),
+    ("wrong-int-negsucc-inj", "negsuccInj",
+     "def negsuccInj : (0 m : Nat) -> (0 n : Nat) -> (0 h : Eq Int (negsucc m) (negsucc n)) -> Eq Nat m n :=",
+     "def negsuccInj : (0 m : Nat) -> (0 n : Nat) -> (0 h : Eq Int (negsucc m) (negsucc n)) -> Eq Nat n m :="),
+    ("wrong-int-pos-ne-negsucc", "posNeNegsucc",
+     "def posNeNegsucc : (0 m : Nat) -> (0 n : Nat) -> (0 h : Eq Int (pos m) (negsucc n)) -> Empty :=",
+     "def posNeNegsucc : (0 m : Nat) -> (0 n : Nat) -> (0 h : Eq Int (negsucc n) (pos m)) -> Empty :="),
+    ("wrong-int-add-comm", "intAddComm",
+     "def intAddComm : (a : Int) -> (b : Int) -> Eq Int (intAdd a b) (intAdd b a) :=",
+     "def intAddComm : (a : Int) -> (b : Int) -> Eq Int (intAdd a b) (intMul b a) :="),
+    ("wrong-int-add-assoc", "intAddAssoc",
+     "    Eq Int (intAdd (intAdd x y) z) (intAdd x (intAdd y z)) :=",
+     "    Eq Int (intAdd (intAdd x y) z) (intAdd y (intAdd x z)) :="),
+    ("wrong-int-add-zero", "intAddZero",
+     "def intAddZero : (a : Int) -> Eq Int (intAdd a intZero) a :=",
+     "def intAddZero : (a : Int) -> Eq Int (intAdd a intZero) intZero :="),
+    ("wrong-int-add-neg-cancel", "intAddNegCancel",
+     "def intAddNegCancel : (a : Int) -> Eq Int (intAdd a (intNeg a)) intZero :=",
+     "def intAddNegCancel : (a : Int) -> Eq Int (intAdd a (intNeg a)) intOne :="),
+    ("wrong-int-add-cancel-left", "intAddCancelLeft",
+     "    (h : Eq Int (intAdd k x) (intAdd k y)) -> Eq Int x y :=",
+     "    (h : Eq Int (intAdd x k) (intAdd y k)) -> Eq Int x y :="),
+    ("wrong-int-mul-comm", "intMulComm",
+     "def intMulComm : (x : Int) -> (y : Int) -> Eq Int (intMul x y) (intMul y x) :=",
+     "def intMulComm : (x : Int) -> (y : Int) -> Eq Int (intMul x y) (intAdd y x) :="),
+    ("wrong-int-mul-assoc", "intMulAssoc",
+     "    Eq Int (intMul (intMul x y) z) (intMul x (intMul y z)) :=",
+     "    Eq Int (intMul (intMul x y) z) (intMul y (intMul x z)) :="),
+    ("wrong-int-mul-one", "intMulOne",
+     "def intMulOne : (a : Int) -> Eq Int (intMul a intOne) a :=",
+     "def intMulOne : (a : Int) -> Eq Int (intMul a intOne) intOne :="),
+    ("wrong-int-mul-zero", "intMulZero",
+     "def intMulZero : (a : Int) -> Eq Int (intMul a intZero) intZero :=",
+     "def intMulZero : (a : Int) -> Eq Int (intMul a intZero) a :="),
+    ("wrong-int-mul-add", "intMulAdd",
+     "    Eq Int (intMul x (intAdd y z)) (intAdd (intMul x y) (intMul x z)) :=",
+     "    Eq Int (intMul x (intAdd y z)) (intAdd (intMul x y) (intMul y z)) :="),
+    ("wrong-int-mul-neg", "intMulNeg",
+     "def intMulNeg : (k : Int) -> (y : Int) -> Eq Int (intMul k (intNeg y)) (intNeg (intMul k y)) :=",
+     "def intMulNeg : (k : Int) -> (y : Int) -> Eq Int (intMul k (intNeg y)) (intMul k y) :="),
+    ("wrong-int-lt-irrefl", "intLtIrrefl",
+     "def intLtIrrefl : (a : Int) -> (0 h : intLt a a) -> Empty :=",
+     "def intLtIrrefl : (a : Int) -> (0 h : intLt intZero a) -> Empty :="),
+    ("wrong-int-lt-trans", "intLtTrans",
+     "    (0 h1 : intLt a b) -> (0 h2 : intLt b c) -> intLt a c :=",
+     "    (0 h1 : intLt a b) -> (0 h2 : intLt b c) -> intLt c a :="),
+    ("wrong-int-add-lt-add-left", "intAddLtAddLeft",
+     "    (0 h : intLt b c) -> intLt (intAdd a b) (intAdd a c) :=",
+     "    (0 h : intLt b c) -> intLt (intAdd b a) (intAdd c a) :="),
+    ("wrong-int-mul-pos", "intMulPos",
+     "    (0 ha : intLt intZero a) -> (0 hb : intLt intZero b) -> intLt intZero (intMul a b) :=",
+     "    (0 ha : intLt intZero a) -> (0 hb : intLt intZero b) -> intLt intZero (intAdd a b) :="),
+    ("wrong-int-lt-trichotomy", "intLtTrichotomy",
+     "def intLtTrichotomy : (x : Int) -> (y : Int) -> Trichotomy Int intLt x y :=",
+     "def intLtTrichotomy : (x : Int) -> (y : Int) -> Trichotomy Int intLt y x :="),
+    ("wrong-int-zero-ne-one", "intZeroNeOne",
+     "def intZeroNeOne : (0 e : Eq Int intZero intOne) -> Empty :=",
+     "def intZeroNeOne : (0 e : Eq Int intOne intZero) -> Empty :="),
+    ("wrong-int-nat-abs-mul", "natAbsMul",
+     "    Eq Nat (natAbs (intMul a b)) (mul (natAbs a) (natAbs b)) :=",
+     "    Eq Nat (natAbs (intMul a b)) (add (natAbs a) (natAbs b)) :="),
+    ("wrong-int-nat-mul-eq-zero-right", "natMulEqZeroRight",
+     "    (h : Eq Nat (mul m n) zero) -> Eq Nat n zero :=",
+     "    (h : Eq Nat (mul m n) zero) -> Eq Nat m zero :="),
+    ("wrong-int-mul-eq-zero-right", "intMulEqZeroRight",
+     "    (h : Eq Int (intMul k z) intZero) -> Eq Int z intZero :=",
+     "    (h : Eq Int (intMul k z) intZero) -> Eq Int k intZero :="),
+    ("wrong-int-mul-cancel-left", "intMulCancelLeft",
+     "    (h : Eq Int (intMul k x) (intMul k y)) -> Eq Int x y :=",
+     "    (h : Eq Int (intMul k x) (intMul k y)) -> Eq Int y x :="),
+    ("wrong-int-dec-eq", "intDecEq",
+     "def intDecEq : (x : Int) -> (y : Int) -> Dec (Eq Int x y) :=",
+     "def intDecEq : (x : Int) -> (y : Int) -> Dec (Eq Int y x) :="),
+]
+
+# These are the four order fields of OrderedField that accept erased
+# hypotheses, specialized to Int. Checking the aliases detects quantity
+# mismatches even when the theorem bodies and rejection controls pass.
+INT_ORDER_SHAPES = """
+def intOrderIrreflShape : (a : Int) -> (0 h : intLt a a) -> Empty :=
+  intLtIrrefl
+def intOrderTransShape : (a : Int) -> (b : Int) -> (c : Int) ->
+    (0 h1 : intLt a b) -> (0 h2 : intLt b c) -> intLt a c :=
+  intLtTrans
+def intOrderAddShape : (a : Int) -> (b : Int) -> (c : Int) ->
+    (0 h : intLt b c) -> intLt (intAdd a b) (intAdd a c) :=
+  intAddLtAddLeft
+def intOrderMulShape : (a : Int) -> (b : Int) ->
+    (0 ha : intLt intZero a) -> (0 hb : intLt intZero b) ->
+    intLt intZero (intMul a b) :=
+  intMulPos
+"""
+
 # A case is (name, full source, expected diagnostic word).
 # None: the checker must accept. A string: the checker must exit with
 # status 1 and print that string in its diagnostic.
 CASES = [
     ("swap-output-identity", BASE, None),
+    ("int-ordered-field-shapes", BASE + INT_ORDER_SHAPES, None),
     ("commuted-rhs", mutate_invariant(GOAL, COMMUTED), "mismatch"),
     ("wrong-denominator", mutate_invariant(GOAL, WRONG_DEN), "mismatch"),
     ("dropped-step", mutate_invariant(LAST_STEP, NO_LAST_STEP), "mismatch"),
@@ -756,7 +859,10 @@ CASES = [
     for name, file_name, def_name, old, new, _failing in M3D_NEGATIVES] + [
     # The nineteen result-type negatives of src/Nat.tot that M4a adds.
     (name, mutate_in_def("Nat", def_name, old, new), "mismatch")
-    for name, def_name, old, new in NAT_NEGATIVES]
+    for name, def_name, old, new in NAT_NEGATIVES] + [
+    # The twenty five result-type negatives of src/Int.tot that M4b adds.
+    (name, mutate_in_def("Int", def_name, old, new), "mismatch")
+    for name, def_name, old, new in INT_NEGATIVES]
 
 # The def that must fail first, for every case that M3a adds. The name
 # comes from the position of the diagnostic, so a mutation that moves the
@@ -779,6 +885,8 @@ FAILING_DEFS = {
        for name, _file, _def_name, _old, _new, failing in M3D_NEGATIVES},
     **{name: def_name
        for name, def_name, _old, _new in NAT_NEGATIVES},
+    **{name: def_name
+       for name, def_name, _old, _new in INT_NEGATIVES},
 }
 
 def failing_def(source, result):

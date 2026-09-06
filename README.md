@@ -24,7 +24,7 @@ Run from this directory. The runner uses the checker named by `TOT` when
 that variable is set. Otherwise it uses the pinned checker at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe` and
 stops with a message when that file is absent. The runner concatenates
-the sixteen source files of `src`, in the order in which the Sources line
+the seventeen source files of `src`, in the order in which the Sources line
 at the end of
 this file names them, in temporary files and checks with `--no-prelude --no-axioms`. It prints the checker
 SHA-256, so validation identifies the binary actually used. No compiler
@@ -520,6 +520,98 @@ fifteen files that stand before it: `Empty`, `Eq`, `subst0`, `sym0`,
 `trans0` and `cong0` of `src/Foundation.tot`, and the `Trichotomy`
 declaration of `src/Axioms.tot`. It cites nothing else of them.
 
+## The integers
+
+`src/Int.tot` is the second slice of milestone M4. The rationals stand
+on the integers, so the carrier milestone builds them next. `data Int`
+is the Lean core shape, with the two constructors `pos` and `negsucc`:
+`pos n` is the natural number `n`, and `negsucc n` is the negation of
+`succ n`, so every integer has exactly one constructor form and no
+integer has two. `intZero` is `pos zero` and `intOne` is `pos one`, both
+reducible defs, so each name and its constructor form are interchangeable
+by the delta step. The file holds three data types and 64 defs. The
+three data types are `Int`, the representation record `IntRepr` and the
+witness record `IntLt`. Ten defs compute: the reducible def rec `intMk`
+and the nine reducible defs `intZero`, `intOne`, `negOfNat`, `intNeg`,
+`intAdd`, `intMul`, `natAbs`, `intFamPos` and `intLt`. The other 54 defs
+are proofs.
+
+The arithmetic rides one canonical difference function. `intMk a b` is
+`a` minus `b` in canonical form: it is `negOfNat b` when `a` is zero, it
+is `pos (succ p)` when `a` is `succ p` and `b` is zero, and it is
+`intMk p q` when both are successors. The shift
+`intMk (succ a) (succ b)` is therefore `intMk a b` by conversion and not
+by a lemma, so no def of the file states it, and every proof writes the
+smaller term where the larger one is expected. `intMk` is the only
+reducible def rec of the file, and every law of `intAdd` and `intMul` is
+one equational chain over `intMk` forms, carried by `intAddMk`,
+`intMulMk`, `intMkAddCancel`, `intMkCong2` and `intMkDiag`.
+
+`data IntRepr` and `intReprOf` say that every integer is a canonical
+difference: `intReprOf x` returns two naturals `a` and `b` and the
+equation `intMk a b = x`. A law of three variables, and any law that
+mixes `intAdd` and `intMul`, is a wrapper that opens one representation
+per variable and transports its goal with one `subst0` per variable,
+innermost variable first, down to a core lemma stated on `intMk` forms.
+`intAddAssoc`, `intMulComm`, `intMulAssoc`, `intMulAdd`, `intMulNeg` and
+`intLtTrichotomy` take that route, over the six cores
+`intAddAssocCore`, `intMulCommCore`, `intMulAssocCore`,
+`intMulAddCore`, `intMulNegCore` and `intLtTrichotomyCore`. A law of one
+or two variables takes the direct constructor split instead, because the
+four arms of the operation table already are the case analysis: in
+`intAddComm` two arms close by conversion, since
+`intAdd (pos m) (negsucc n)` and `intAdd (negsucc n) (pos m)` are the
+same term `intMk m (succ n)`, and the other two are one `cong0` of
+`addComm` each, which costs eleven lines against the twenty four of the
+transport route. `intAddComm`, `intAddZero`, `intAddNegCancel`,
+`intMulOne`, `intMulZero`, `natAbsMul`, `intMulEqZeroRight` and
+`intDecEq` take the split.
+
+The order is the witness record `IntLt`, in the `NatLt` shape of
+`src/Nat.tot`. The proposition `x < y` holds when one `k` has
+`intAdd x (pos (succ k)) = y`, so a proof of `intLt x y` is a pair of
+the difference `k` and that equation. Both fields carry quantity 0, so
+the four order laws accept erased hypotheses with the exact signatures
+required by `OrderedField`. The witness is available in proofs and
+erased from runtime computation. The record is not a comparison of
+the two components of a canonical difference: an integer is a
+constructor form and not a pair, `intMk a b` and
+`intMk (succ a) (succ b)` are the same integer, and a comparison of
+components would
+therefore need a four way constructor split and its own shift lemma in
+every proof. The witness carries one equation instead, so
+`intLtIrrefl`, `intLtTrans`, `intAddLtAddLeft` and `intMulPos` read the
+difference off the hypothesis and close with the addition laws, and none
+of them recurses. `intLt` is a reducible def over `IntLt`, and not the
+data type former itself, because `Trichotomy` takes its relation at
+quantity w while a data type former carries its parameters at quantity
+0. Conversion joins `intLt x y` and `IntLt x y` by the delta step, so
+`intLtWitness x y k e` inhabits `intLt x y` with no wrapper.
+
+The `OrderedField` record carries nine operation parameters, `fadd`,
+`fmul`, `fsub`, `fdiv`, `fneg`, `finv`, `fzero`, `fone` and `flt`, and
+states seventeen axioms over them. The fourteen axiom shapes that name
+no subtraction, no division and no inverse are all present, with F
+`Int`, fadd `intAdd`, fmul `intMul`, fneg `intNeg`, fzero `intZero`,
+fone `intOne` and flt `intLt`:
+the eight ring shapes `intAddComm`, `intAddAssoc`, `intAddZero`,
+`intAddNegCancel`, `intMulComm`, `intMulAssoc`, `intMulOne` and
+`intMulAdd`, and the six order shapes `intLtIrrefl`, `intLtTrans`,
+`intAddLtAddLeft`, `intMulPos`, `intLtTrichotomy` and `intZeroNeOne`.
+
+M4b adds no axiom. The seventeen axioms of `OrderedField` are unchanged,
+and `src/Int.tot` names none of them, because it is a closed development
+on the two carriers `Int` and `Nat` and takes no parameters. It cites
+six declarations of `src/Foundation.tot`, `Empty`, `Eq`, `subst0`,
+`sym0`, `trans0` and `cong0`, the `Trichotomy` declaration of
+`src/Axioms.tot`, and the named laws of `src/Nat.tot`, which are
+`succInj`, `zeroNotSucc`, `addZero`, `addSuccRight`, `addComm`,
+`addAssoc`, `addLeftComm`, `mulZeroRight`, `mulSuccRight`, `mulComm`,
+`addMulRight`, `mulAssoc`, `mulOne`, `mulAdd`, `ltTrichotomy`,
+`zeroNeOne` and `natDecEq`, beside the carriers `Nat` and `Dec` and the
+computing defs `add`, `mul` and `one`. It cites nothing else of the
+sixteen frozen files.
+
 ## Measurement
 
 | Quantity | Lean | tot, pilot | tot, record |
@@ -706,12 +798,13 @@ are one in each of `addLiquidityPreservesRatio`, `lpShareCross`,
 context. The five `subst0` are two in `addLiquidityPreservesRatio`, two
 in `lpShareCross` and one in `addRemoveRoundtripX`.
 
-The one file of M4a, in proof-term occurrences. Comment lines are
-excluded from the counts, as in the tables above.
+The one file of M4a and the one file of M4b, in proof-term occurrences.
+Comment lines are excluded from the counts, as in the tables above.
 
 | file | Lean | lines | `trans0` | `cong0` | `sym0` | `subst0` |
 | --- | --- | --- | --- | --- | --- | --- |
 | `src/Nat.tot` | Lean core and Mathlib | 299 | 20 | 23 | 12 | 1 |
+| src/Int.tot | Lean core | 1081 | 81 | 61 | 55 | 16 |
 
 The file is 318 lines with its nineteen-line header comment, and 299
 lines without it. The Lean column names the library that supplies the
@@ -721,6 +814,24 @@ one `subst0` is the transport of `zeroNotSucc` over `natFamZero`. The
 twenty `trans0`, the 23 `cong0` and the twelve `sym0` are the steps of
 the semiring laws, the order laws and the two subtraction laws, which
 chain equations by hand, because tot has no rewrite form.
+
+`src/Int.tot` is 1106 lines with its twenty five line header comment,
+and 1081 lines without it, which is the line count of its row. The four
+other numbers of that row are 81 `trans0`, 61 `cong0`, 55 `sym0` and
+sixteen `subst0`, and `J0` is 0 here, as in `src/Nat.tot`. The Lean
+column names Lean core alone, because `Int`, its arithmetic and its
+order all come from Lean core. The Nat rearrangement `natAddShuffle`
+also has a Lean core source, `Nat.add_add_add_comm`, which
+`src/Nat.tot` does not hold. The
+sixteen `subst0` are the one transport of `posNeNegsucc` over
+`intFamPos` and the fifteen transports of the six wrappers that open a
+representation: three in `intAddAssoc`, two in `intMulComm`, three in
+`intMulAssoc`, three in `intMulAdd`, two in `intMulNeg` and two in
+`intLtTrichotomy`. The 81 `trans0`, the 61 `cong0` and the 55 `sym0` are
+the steps of the ring laws, the order laws and the six cores, which
+chain equations by hand for the same reason. The file is 3.6 times
+`src/Nat.tot`, because every law of the integers is a law of the
+naturals on two components at once.
 
 The Lean source of each def of `src/Nat.tot`, in file order.
 
@@ -764,8 +875,91 @@ first two from `Nat.noConfusion`, and its order is `Nat.lt`, which is
 `mul` and `one`, because those three are the Lean core declarations
 `Nat.add`, `Nat.mul` and the numeral, and not theorems.
 
-`test/check.py` runs in about 7.5 seconds of wall time on the pinned
-checker, for all 116 cases.
+The Lean source of each def of `src/Int.tot`, in file order. The table
+holds one row for each of the 64 defs, and no row for the three data
+types.
+
+| def | Lean source |
+| --- | --- |
+| `intZero` | no source |
+| `intOne` | no source |
+| `negOfNat` | Lean core `Int.negOfNat` |
+| `intMk` | Lean core `Int.subNatNat` |
+| `intNeg` | Lean core `Int.neg` |
+| `intAdd` | Lean core `Int.add` |
+| `intMul` | Lean core `Int.mul` |
+| `natAbs` | Lean core `Int.natAbs` |
+| `intFamPos` | no source |
+| `posInj` | Lean core `Int.ofNat.inj` |
+| `negsuccInj` | Lean core `Int.negSucc.inj` |
+| `posNeNegsucc` | Lean core `Int.noConfusion` |
+| `natAbsNegOfNat` | Lean core `Int.natAbs_negOfNat` |
+| `intMkPos` | Lean core `Int.subNatNat_add_left`, with the subtracted natural zero |
+| `intMkNegsucc` | Lean core `Int.subNatNat_add_right`, with the first natural zero |
+| `intMkAddCancel` | Lean core `Int.subNatNat_add_add` |
+| `intMkCong2` | no source |
+| `intMkEqOfAdd` | no source |
+| `intMkDiag` | Lean core `Int.subNatNat_self` |
+| `intReprOf` | no source |
+| `intAddZeroLeft` | Lean core `Int.zero_add` |
+| `intAddPosMk` | Lean core `Int.subNatNat_add`, with the equality reversed |
+| `intAddNegsuccMk` | Lean core `Int.subNatNat_add_negSucc`, using addition commutativity |
+| `intAddMk` | no source |
+| `intNegMk` | no source |
+| `intMulZeroLeft` | Lean core `Int.zero_mul` |
+| `intMulPosMk` | Lean core `Int.ofNat_mul_subNatNat` |
+| `intMulNegsuccMk` | Lean core `Int.negSucc_mul_subNatNat` |
+| `natAddShuffle` | Lean core `Nat.add_add_add_comm` |
+| `intMulMk` | no source |
+| `intAddComm` | Lean core `Int.add_comm` |
+| `intAddAssocCore` | no source |
+| `intAddAssoc` | Lean core `Int.add_assoc` |
+| `intAddZero` | Lean core `Int.add_zero` |
+| `intAddNegCancel` | Lean core `Int.add_right_neg` |
+| `intNegAddCancel` | Lean core `Int.add_left_neg` |
+| `intAddCancelLeft` | Lean core `Int.add_left_cancel` |
+| `intMulCommCore` | no source |
+| `intMulComm` | Lean core `Int.mul_comm` |
+| `natMulAssocCross` | no source |
+| `intMulAssocCore` | no source |
+| `intMulAssoc` | Lean core `Int.mul_assoc` |
+| `natMulAddShuffle` | no source |
+| `intMulAddCore` | no source |
+| `intMulAdd` | Lean core `Int.mul_add` |
+| `intMulOne` | Lean core `Int.mul_one` |
+| `intMulZero` | Lean core `Int.mul_zero` |
+| `intMulNegCore` | no source |
+| `intMulNeg` | Lean core `Int.mul_neg` |
+| `intLt` | Lean core `Int.lt` |
+| `intLtIrrefl` | Lean core `Int.lt_irrefl` |
+| `intLtTrans` | Lean core `Int.lt_trans` |
+| `intAddLtAddLeft` | Lean core `Int.add_lt_add_left` |
+| `intMulPos` | Lean core `Int.mul_pos` |
+| `natAddRightComm` | Lean core `Nat.add_right_comm` |
+| `intLtTrichotomyCore` | no source |
+| `intLtTrichotomy` | Lean core `Int.lt_trichotomy` |
+| `intZeroNeOne` | Lean core `Int.zero_ne_one` |
+| `natAbsMul` | Lean core `Int.natAbs_mul` |
+| `natMulEqZeroRight` | Lean core `Nat.mul_eq_zero`, forward direction with a nonzero left factor |
+| `intEqZeroOfNatAbs` | Lean core `Int.natAbs_eq_zero`, forward direction |
+| `intMulEqZeroRight` | Lean core `Int.mul_eq_zero`, forward direction with a nonzero left factor |
+| `intMulCancelLeft` | Lean core `Int.eq_of_mul_eq_mul_left` |
+| `intDecEq` | Lean core `Int.decEq` |
+
+`data IntLt` carries `Int.lt` as the relation and not as the definition:
+Lean core defines `Int.lt a b` as `Int.le (a + 1) b`, while `IntLt`
+holds the difference and its equation, and the row above names
+`Int.lt` for the reducible def `intLt` that stands over the record. The
+seventeen rows that read "no source" have no direct source listed:
+`intZero`, `intOne`, `intFamPos`, `intMkCong2`, `intMkEqOfAdd`,
+`intReprOf`, `intAddMk`, `intNegMk`, `intMulMk`, the six cores,
+`natMulAssocCross` and `natMulAddShuffle`. The table names equivalent
+laws in Lean core, with specializations, equality reversal and
+commutativity noted where the interfaces differ. These references were
+checked against the Lean v4.30.0-rc1 sources used by `amm-lean`.
+
+`test/check.py` runs in about 16 seconds of wall time on the pinned
+checker, for all 142 cases.
 
 ## Scope and trust
 
@@ -798,7 +992,7 @@ three fields that the record gained.
 
 ## Validation
 
-On 2026-09-06, all 116 checks passed with checker SHA-256
+On 2026-09-06, all 142 checks passed with checker SHA-256
 `30c4524d57f6723e39ba117097222f3ab8ef3e899a8a4af8b7e60c68337842bf` at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe`,
 built from tot commit `8cf0b8b` with a clean tree. Build that commit to
@@ -807,7 +1001,7 @@ reproduce the reference checker.
 The checker reports every rejection in this repository with the word
 `mismatch`, except the axiom case, which reports `axiom`.
 
-The 116 checks:
+The 142 checks:
 
 - The theorem checks without a prelude or axioms.
 - The proof is rejected against a commuted right side, `fmul y x`.
@@ -959,7 +1153,40 @@ The 116 checks:
   their own, because a mutation of any of them is caught by the theorem
   that cites it.
 
-For the eighty-five checks that M3a, M3b, M3c, M3d and M4a add, the
+- One positive check, `int-ordered-field-shapes`, assigns
+  `intLtIrrefl`, `intLtTrans`, `intAddLtAddLeft` and `intMulPos` to the
+  four order field signatures of `OrderedField`, specialized to `Int`.
+  This checks that the hypothesis quantities match the interface as
+  well as the propositions.
+- Twenty five checks, one for each theorem of `src/Int.tot` that M4b
+  adds. Each check changes the result type of the theorem and keeps the
+  proof, so each one is rejected at its own def:
+  `wrong-int-pos-inj` at `posInj`, `wrong-int-negsucc-inj` at
+  `negsuccInj`, `wrong-int-pos-ne-negsucc` at `posNeNegsucc`,
+  `wrong-int-add-comm` at `intAddComm`, `wrong-int-add-assoc` at
+  `intAddAssoc`, `wrong-int-add-zero` at `intAddZero`,
+  `wrong-int-add-neg-cancel` at `intAddNegCancel`,
+  `wrong-int-add-cancel-left` at `intAddCancelLeft`,
+  `wrong-int-mul-comm` at `intMulComm`, `wrong-int-mul-assoc` at
+  `intMulAssoc`, `wrong-int-mul-one` at `intMulOne`,
+  `wrong-int-mul-zero` at `intMulZero`, `wrong-int-mul-add` at
+  `intMulAdd`, `wrong-int-mul-neg` at `intMulNeg`,
+  `wrong-int-lt-irrefl` at `intLtIrrefl`, `wrong-int-lt-trans` at
+  `intLtTrans`, `wrong-int-add-lt-add-left` at `intAddLtAddLeft`,
+  `wrong-int-mul-pos` at `intMulPos`, `wrong-int-lt-trichotomy` at
+  `intLtTrichotomy`, `wrong-int-zero-ne-one` at `intZeroNeOne`,
+  `wrong-int-nat-abs-mul` at `natAbsMul`,
+  `wrong-int-nat-mul-eq-zero-right` at `natMulEqZeroRight`,
+  `wrong-int-mul-eq-zero-right` at `intMulEqZeroRight`,
+  `wrong-int-mul-cancel-left` at `intMulCancelLeft` and
+  `wrong-int-dec-eq` at `intDecEq`. Every anchor is the last line of the
+  def header, the one that ends in the trailing `:=`, so the mutation
+  changes the result type and no step of the body. The cores, the
+  canonical difference lemmas and the Nat helpers get no negative of
+  their own, because a mutation of any of them is caught by the theorem
+  that cites it.
+
+For the 110 checks that M3a, M3b, M3c, M3d, M4a and M4b add, the
 runner also
 reads
 the position
@@ -1120,16 +1347,17 @@ Milestone M4 supplies a concrete carrier: an inhabitant of
 instance. Every ordered field is infinite, so the carrier is the
 rationals, and M4 is cut into five slices.
 
-1. M4a, the natural numbers, `src/Nat.tot`. Done, this commit.
-2. M4b, the integers, `src/Int.tot`.
+1. M4a, the natural numbers, `src/Nat.tot`. Done.
+2. M4b, the integers, `src/Int.tot`. Done, this commit.
 3. M4c, divisibility and the greatest common divisor, `src/Gcd.tot`.
 4. M4d, the reduced fractions and the field laws, `src/Rat.tot`.
 5. M4e, the order, the `OrderedField` inhabitant and the closed
    instance, `src/RatOrder.tot` and `src/Instance.tot`.
 
-Sources, eighteen files: `src/Foundation.tot`, `src/Field.tot`,
+Sources, nineteen files: `src/Foundation.tot`, `src/Field.tot`,
 `src/Invariant.tot`, `src/Axioms.tot`, `src/Ring.tot`, `src/Laws.tot`,
 `src/Compose.tot`, `src/Frac.tot`, `src/Order.tot`, `src/Pool.tot`,
 `src/Basic.tot`, `src/Product.tot`, `src/NoDrain.tot`,
 `src/PriceImpact.tot`, `src/Liquidity.tot`, `src/Nat.tot`,
-`test/check.py`, `README.md`. The first sixteen are the check order.
+`src/Int.tot`, `test/check.py`, `README.md`. The first seventeen are the
+check order.
