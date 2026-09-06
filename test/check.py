@@ -1,7 +1,8 @@
-"""Check the swap identity and its rejection controls with a tot executable."""
+"""Check the swap identity, its derivation from axioms, and the rejection controls."""
 from pathlib import Path
 import hashlib
 import os
+import re
 import subprocess
 import tempfile
 
@@ -9,10 +10,18 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_TOT = Path("/Users/oobi/Documents/kan-lang-tot-pin/"
                    "_build/default/bin/tot.exe")
 TOT = Path(os.environ.get("TOT", DEFAULT_TOT))
-FOUNDATION = (ROOT / "src" / "Foundation.tot").read_text()
-FIELD = (ROOT / "src" / "Field.tot").read_text()
-INVARIANT = (ROOT / "src" / "Invariant.tot").read_text()
-BASE = FOUNDATION + "\n" + FIELD + "\n" + INVARIANT
+NAMES = ["Foundation", "Field", "Invariant", "Axioms", "Ring", "Laws", "Compose"]
+FILES = {name: (ROOT / "src" / f"{name}.tot").read_text() for name in NAMES}
+FIELD = FILES["Field"]
+INVARIANT = FILES["Invariant"]
+AXIOMS = FILES["Axioms"]
+LAWS_SRC = FILES["Laws"]
+
+def concatenate(**changed):
+    """Return the seven sources in check order, with the named ones replaced."""
+    return "\n".join(changed.get(name, FILES[name]) for name in NAMES)
+
+BASE = concatenate()
 
 GOAL = ("  Eq F (fmul (fadd x dx) (fsub y (fdiv (fmul y dx) (fadd x dx))))"
         " (fmul x y) :=\n")
@@ -64,11 +73,63 @@ LAWS = [
      "Eq F (fsub (fadd a b) b) (fsub (fadd a b) b)"),
 ]
 
+# Each axiom of OrderedField, and a weakened replacement for it. The
+# axiom record has no projections, so the text occurs once in
+# Axioms.tot. Every proof stays unchanged, and the first def that uses
+# the axiom is rejected.
+AXIOM_LAWS = [
+    ("addComm",
+     "Eq F (fadd a b) (fadd b a)",
+     "Eq F (fadd a b) (fadd a b)"),
+    ("addAssoc",
+     "Eq F (fadd (fadd a b) c) (fadd a (fadd b c))",
+     "Eq F (fadd (fadd a b) c) (fadd (fadd a b) c)"),
+    ("addZero",
+     "Eq F (fadd a fzero) a",
+     "Eq F (fadd a fzero) (fadd a fzero)"),
+    ("addNegCancel",
+     "Eq F (fadd a (fneg a)) fzero",
+     "Eq F (fadd a (fneg a)) (fadd a (fneg a))"),
+    ("mulComm",
+     "Eq F (fmul a b) (fmul b a)",
+     "Eq F (fmul a b) (fmul a b)"),
+    ("mulAssoc",
+     "Eq F (fmul (fmul a b) c) (fmul a (fmul b c))",
+     "Eq F (fmul (fmul a b) c) (fmul (fmul a b) c)"),
+    ("mulOne",
+     "Eq F (fmul a fone) a",
+     "Eq F (fmul a fone) (fmul a fone)"),
+    ("mulAdd",
+     "Eq F (fmul a (fadd b c)) (fadd (fmul a b) (fmul a c))",
+     "Eq F (fmul a (fadd b c)) (fmul a (fadd b c))"),
+    ("subEqAddNeg",
+     "Eq F (fsub a b) (fadd a (fneg b))",
+     "Eq F (fsub a b) (fsub a b)"),
+    ("divEqMulInv",
+     "Eq F (fdiv a b) (fmul a (finv b))",
+     "Eq F (fdiv a b) (fdiv a b)"),
+    ("mulInvCancel",
+     "Eq F (fmul a (finv a)) fone",
+     "Eq F (fmul a (finv a)) (fmul a (finv a))"),
+    ("ltIrrefl",
+     "(0 h : flt a a) -> Empty",
+     "(0 h : flt a a) -> flt a a"),
+    ("ltTrans",
+     "(0 h2 : flt b c) -> flt a c",
+     "(0 h2 : flt b c) -> flt a b"),
+    ("addLtAddLeft",
+     "(0 h : flt b c) -> flt (fadd a b) (fadd a c)",
+     "(0 h : flt b c) -> flt b c"),
+]
+
+DERIVE_ADD_MUL = "(deriveAddMul F fadd fmul fsub fdiv fneg finv fzero fone flt A)"
+DERIVE_MUL_COMM = "(deriveMulComm F fadd fmul fsub fdiv fneg finv fzero fone flt A)"
+
 def mutate_invariant(old, new):
     """Return BASE with one exact substring of the invariant replaced."""
     if INVARIANT.count(old) != 1:
         raise SystemExit(f"anchor is not unique in Invariant.tot: {old!r}")
-    return FOUNDATION + "\n" + FIELD + "\n" + INVARIANT.replace(old, new)
+    return concatenate(Invariant=INVARIANT.replace(old, new))
 
 def mutate_field(old, new, count):
     """Return BASE with every occurrence of a record substring replaced.
@@ -80,7 +141,40 @@ def mutate_field(old, new, count):
     if found != count:
         raise SystemExit(f"anchor occurs {found} times, not {count}, "
                          f"in Field.tot: {old!r}")
-    return FOUNDATION + "\n" + FIELD.replace(old, new) + "\n" + INVARIANT
+    return concatenate(Field=FIELD.replace(old, new))
+
+def mutate_axioms(old, new):
+    """Return BASE with one exact substring of the axiom record replaced."""
+    if AXIOMS.count(old) != 1:
+        raise SystemExit(f"anchor is not unique in Axioms.tot: {old!r}")
+    return concatenate(Axioms=AXIOMS.replace(old, new))
+
+def def_span(name):
+    """Return the span of one def of Laws.tot, from its header to its check line."""
+    header = re.search(rf"^def {name}\b", LAWS_SRC, re.MULTILINE)
+    if header is None:
+        raise SystemExit(f"def not found in Laws.tot: {name}")
+    return header.start(), LAWS_SRC.index(f"\ncheck {name}\n", header.start())
+
+def mutate_laws(name, old, new):
+    """Return BASE with one exact substring inside one def of Laws.tot replaced."""
+    start, end = def_span(name)
+    block = LAWS_SRC[start:end]
+    if block.count(old) != 1:
+        raise SystemExit(f"anchor is not unique in {name}: {old!r}")
+    return concatenate(Laws=LAWS_SRC[:start] + block.replace(old, new)
+                       + LAWS_SRC[end:])
+
+def swap_in_laws(name, first, second):
+    """Return BASE with two unique substrings inside one def of Laws.tot exchanged."""
+    start, end = def_span(name)
+    block = LAWS_SRC[start:end]
+    if block.count(first) != 1 or block.count(second) != 1:
+        raise SystemExit(f"anchors are not unique in {name}: "
+                         f"{first!r}, {second!r}")
+    swapped = (block.replace(first, "\0").replace(second, first)
+               .replace("\0", second))
+    return concatenate(Laws=LAWS_SRC[:start] + swapped + LAWS_SRC[end:])
 
 # A case is (name, full source, expected diagnostic word).
 # None: the checker must accept. A string: the checker must exit with
@@ -97,6 +191,12 @@ CASES = [
      for name, old, new in LAWS] + [
     ("wrong-projection",
      mutate_field("=> mulComm a b", "=> mulComm b a", 1), "mismatch"),
+] + [(f"weak-axiom-{name}", mutate_axioms(old, new), "mismatch")
+     for name, old, new in AXIOM_LAWS] + [
+    ("wrong-derive-mulcomm",
+     mutate_laws("deriveMulComm", "mulComm a b", "mulComm b a"), "mismatch"),
+    ("wrong-field-order",
+     swap_in_laws("fieldLawsOf", DERIVE_ADD_MUL, DERIVE_MUL_COMM), "mismatch"),
     ("axiom-rejected",
      BASE + "\naxiom fake : (0 F : Type 0) -> (a : F) -> (b : F) ->"
             " Eq F a b\n", "axiom"),

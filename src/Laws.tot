@@ -1,0 +1,300 @@
+-- The eight laws of FieldLaws, proved from the OrderedField axioms.
+-- Each def below takes the ten parameters of src/Ring.tot and one axiom
+-- record A, and returns the matching field of FieldLaws with the same
+-- binders and quantities as src/Field.tot. Each proof is a chain of
+-- trans0 steps with cong0 for a rewrite inside a context and sym0 for a
+-- reversed axiom, or one application when no rewrite is needed.
+-- fieldLawsOf builds the FieldLaws record once from the eight defs.
+
+-- deriveAddPos: the sum of two positive field elements is positive.
+-- This is the addPos field of FieldLaws in src/Field.tot, proved from the
+-- axioms of src/Axioms.tot. The body is a plain application, not a trans0
+-- chain: ltTrans carries the two order steps, and subst0 rewrites the
+-- left endpoint of addLtAddLeft along addZero so it lines up with ltTrans.
+-- Every carrier and endpoint of subst0 is spelled out, because the
+-- checker rejects holes in its leading erased slots.
+-- Mathlib source: add_pos (via lt_trans, add_lt_add_left, add_zero).
+def deriveAddPos :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (0 ha : flt fzero a) -> (0 hb : flt fzero b) -> flt fzero (fadd a b) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b ha hb =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+      ltTrans fzero a (fadd a b) ha
+        (subst0 F (fadd a fzero) a
+          (fun z => flt z (fadd a b))
+          (addZero a)
+          (addLtAddLeft a fzero b hb))
+    end
+
+check deriveAddPos
+
+-- deriveNeOfGt proves the FieldLaws field neOfGt from the axioms of
+-- src/Axioms.tot. A value a that is strictly greater than fzero cannot
+-- equal fzero, because ltIrrefl rejects flt fzero fzero, and e rewrites
+-- h : flt fzero a into flt fzero fzero along e : Eq F a fzero.
+-- Mathlib source: ne_of_gt.
+def deriveNeOfGt :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (0 h : flt fzero a) -> (0 e : Eq F a fzero) -> Empty :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a h e =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+      ltIrrefl fzero (subst0 F a fzero (fun z => flt fzero z) e h)
+    end
+
+check deriveNeOfGt
+
+-- deriveMulSub: a * (b - c) = a * b - a * c, derived from the axioms of
+-- src/Axioms.tot and the helper mulNeg of src/Ring.tot.
+-- Chain: rewrite (b - c) to (b + -c) by subEqAddNeg; distribute with mulAdd;
+-- rewrite (a * -c) to -(a * c) by mulNeg under the right-hand context; then
+-- fold (a*b) + -(a*c) back to (a*b) - (a*c) by the reverse of subEqAddNeg.
+def deriveMulSub :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (c : F) -> Eq F (fmul a (fsub b c)) (fsub (fmul a b) (fmul a c)) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+      trans0 F
+        (fmul a (fsub b c))
+        (fmul a (fadd b (fneg c)))
+        (fsub (fmul a b) (fmul a c))
+        (cong0 F F
+          (fsub b c)
+          (fadd b (fneg c))
+          (fun z => fmul a z)
+          (subEqAddNeg b c))
+      (trans0 F
+        (fmul a (fadd b (fneg c)))
+        (fadd (fmul a b) (fmul a (fneg c)))
+        (fsub (fmul a b) (fmul a c))
+        (mulAdd a b (fneg c))
+      (trans0 F
+        (fadd (fmul a b) (fmul a (fneg c)))
+        (fadd (fmul a b) (fneg (fmul a c)))
+        (fsub (fmul a b) (fmul a c))
+        (cong0 F F
+          (fmul a (fneg c))
+          (fneg (fmul a c))
+          (fun z => fadd (fmul a b) z)
+          (mulNeg F fadd fmul fsub fdiv fneg finv fzero fone flt A a c))
+        (sym0 F
+          (fsub (fmul a b) (fmul a c))
+          (fadd (fmul a b) (fneg (fmul a c)))
+          (subEqAddNeg (fmul a b) (fmul a c)))))
+    end
+
+check deriveMulSub
+
+-- deriveMulDivAssoc: fmul a (fdiv b c) = fdiv (fmul a b) c, from the axioms
+-- of src/Axioms.tot. Chain: rewrite fdiv b c to fmul b (finv c) by
+-- divEqMulInv; slide the fmul a across by sym0 of mulAssoc a b (finv c);
+-- fold fmul (fmul a b) (finv c) back to fdiv (fmul a b) c by sym0 of
+-- divEqMulInv (fmul a b) c.
+-- Mathlib source: mul_div_assoc.
+def deriveMulDivAssoc :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (c : F) -> Eq F (fmul a (fdiv b c)) (fdiv (fmul a b) c) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+      trans0 F
+        (fmul a (fdiv b c))
+        (fmul a (fmul b (finv c)))
+        (fdiv (fmul a b) c)
+        (cong0 F F
+          (fdiv b c)
+          (fmul b (finv c))
+          (fun z => fmul a z)
+          (divEqMulInv b c))
+      (trans0 F
+        (fmul a (fmul b (finv c)))
+        (fmul (fmul a b) (finv c))
+        (fdiv (fmul a b) c)
+        (sym0 F
+          (fmul (fmul a b) (finv c))
+          (fmul a (fmul b (finv c)))
+          (mulAssoc a b (finv c)))
+        (sym0 F
+          (fdiv (fmul a b) c)
+          (fmul (fmul a b) (finv c))
+          (divEqMulInv (fmul a b) c)))
+    end
+
+check deriveMulDivAssoc
+
+-- deriveMulDivCancelLeft: (a * b) / a = b, for a nonzero, derived from the
+-- axioms of src/Axioms.tot.
+-- Chain: rewrite (a * b) / a to (a * b) * (finv a) by divEqMulInv; commute
+-- the numerator product to (b * a) * (finv a) by mulComm under the left
+-- context; regroup to b * (a * (finv a)) by mulAssoc; rewrite the inner
+-- a * (finv a) to fone by mulInvCancel under the right context; fold
+-- b * fone back to b by mulOne.
+-- Mathlib source: mul_div_cancel_left0.
+def deriveMulDivCancelLeft :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (0 hne : (0 e : Eq F a fzero) -> Empty) -> Eq F (fdiv (fmul a b) a) b :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b hne =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+      trans0 F
+        (fdiv (fmul a b) a)
+        (fmul (fmul a b) (finv a))
+        b
+        (divEqMulInv (fmul a b) a)
+      (trans0 F
+        (fmul (fmul a b) (finv a))
+        (fmul (fmul b a) (finv a))
+        b
+        (cong0 F F
+          (fmul a b)
+          (fmul b a)
+          (fun z => fmul z (finv a))
+          (mulComm a b))
+      (trans0 F
+        (fmul (fmul b a) (finv a))
+        (fmul b (fmul a (finv a)))
+        b
+        (mulAssoc b a (finv a))
+      (trans0 F
+        (fmul b (fmul a (finv a)))
+        (fmul b fone)
+        b
+        (cong0 F F
+          (fmul a (finv a))
+          fone
+          (fun z => fmul b z)
+          (mulInvCancel a hne))
+        (mulOne b))))
+    end
+
+check deriveMulDivCancelLeft
+
+-- Derived law: addMul. Distributivity of fmul over fadd on the left factor.
+-- Mathlib source: add_mul. Cited helpers: none; the chain rewrites through
+-- mulComm and mulAdd alone.
+def deriveAddMul :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> (c : F) -> Eq F (fmul (fadd a b) c) (fadd (fmul a c) (fmul b c)) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b c =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+      trans0 F
+        (fmul (fadd a b) c)
+        (fmul c (fadd a b))
+        (fadd (fmul a c) (fmul b c))
+        (mulComm (fadd a b) c)
+      (trans0 F
+        (fmul c (fadd a b))
+        (fadd (fmul c a) (fmul c b))
+        (fadd (fmul a c) (fmul b c))
+        (mulAdd c a b)
+      (trans0 F
+        (fadd (fmul c a) (fmul c b))
+        (fadd (fmul a c) (fmul c b))
+        (fadd (fmul a c) (fmul b c))
+        (cong0 F F
+          (fmul c a)
+          (fmul a c)
+          (fun z => fadd z (fmul c b))
+          (mulComm c a))
+        (cong0 F F
+          (fmul c b)
+          (fmul b c)
+          (fun z => fadd (fmul a c) z)
+          (mulComm c b))))
+    end
+
+check deriveAddMul
+
+-- deriveMulComm: the commutativity of multiplication, restated as the
+-- FieldLaws mulComm field type, proved directly from the OrderedField
+-- axiom mulComm. The axiom already states the law verbatim, so the body
+-- is a plain application: no rewrite chain is needed.
+def deriveMulComm :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> Eq F (fmul a b) (fmul b a) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+      mulComm a b
+    end
+
+check deriveMulComm
+
+-- deriveAddSubCancelRight, the tot theorem for FieldLaws field
+-- addSubCancelRight: (a - b) + b = a, port of Mathlib add_sub_cancel_right,
+-- derived from the fourteen axioms of src/Axioms.tot.
+def deriveAddSubCancelRight :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (a : F) -> (b : F) -> Eq F (fsub (fadd a b) b) a :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A a b =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft =>
+      trans0 F
+        (fsub (fadd a b) b)
+        (fadd (fadd a b) (fneg b))
+        a
+        (subEqAddNeg (fadd a b) b)
+      (trans0 F
+        (fadd (fadd a b) (fneg b))
+        (fadd a (fadd b (fneg b)))
+        a
+        (addAssoc a b (fneg b))
+      (trans0 F
+        (fadd a (fadd b (fneg b)))
+        (fadd a fzero)
+        a
+        (cong0 F F
+          (fadd b (fneg b))
+          fzero
+          (fun z => fadd a z)
+          (addNegCancel b))
+        (addZero a)))
+    end
+
+check deriveAddSubCancelRight
+
+def fieldLawsOf :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  FieldLaws F fadd fmul fsub fdiv fzero flt :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A =>
+    fieldLaws F fadd fmul fsub fdiv fzero flt
+      (deriveAddPos F fadd fmul fsub fdiv fneg finv fzero fone flt A)
+      (deriveNeOfGt F fadd fmul fsub fdiv fneg finv fzero fone flt A)
+      (deriveMulSub F fadd fmul fsub fdiv fneg finv fzero fone flt A)
+      (deriveMulDivAssoc F fadd fmul fsub fdiv fneg finv fzero fone flt A)
+      (deriveMulDivCancelLeft F fadd fmul fsub fdiv fneg finv fzero fone flt A)
+      (deriveAddMul F fadd fmul fsub fdiv fneg finv fzero fone flt A)
+      (deriveMulComm F fadd fmul fsub fdiv fneg finv fzero fone flt A)
+      (deriveAddSubCancelRight F fadd fmul fsub fdiv fneg finv fzero fone flt A)
+
+check fieldLawsOf

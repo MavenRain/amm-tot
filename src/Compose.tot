@@ -1,0 +1,19 @@
+-- The swap identity against the axioms alone. The theorem of
+-- src/Invariant.tot takes one FieldLaws record. fieldLawsOf builds that
+-- record from one OrderedField record, so the composition takes the
+-- fourteen axioms as its only hypothesis about the field.
+-- The eight operations carry quantity w, because they flow into the w
+-- binders of fieldLawsOf and of swapOutputIdentity.
+def swapOutputIdentityOf :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (x : F) -> (y : F) -> (dx : F) -> (0 hx : flt fzero x) -> (0 hdx : flt fzero dx) ->
+  Eq F (fmul (fadd x dx) (fsub y (fdiv (fmul y dx) (fadd x dx)))) (fmul x y) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A x y dx hx hdx =>
+    swapOutputIdentity F fadd fmul fsub fdiv fzero flt
+      (fieldLawsOf F fadd fmul fsub fdiv fneg finv fzero fone flt A)
+      x y dx hx hdx
+
+check swapOutputIdentityOf
