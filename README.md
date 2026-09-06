@@ -8,7 +8,9 @@ rewrite form. The theorem is proved twice: once against a record of the
 eight field laws that the Lean proof cites, and once against a record of
 seventeen ordered-field axioms, from which the eight laws are derived.
 The port also states the AMM itself: the two data records of
-`AmmLean/Basic.lean`, its nine definitions and its eight theorems.
+`AmmLean/Basic.lean`, its nine definitions and its eight theorems. It
+also proves the four remaining theorems of `AmmLean/Invariant.lean` and
+the six theorems of `AmmLean/NoDrain.lean`.
 
 ## Check
 
@@ -20,7 +22,7 @@ Run from this directory. The runner uses the checker named by `TOT` when
 that variable is set. Otherwise it uses the pinned checker at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe` and
 stops with a message when that file is absent. The runner concatenates
-the eleven source files of `src`, in the order in which the Sources line
+the thirteen source files of `src`, in the order in which the Sources line
 at the end of
 this file names them, in temporary files and checks with `--no-prelude --no-axioms`. It prints the checker
 SHA-256, so validation identifies the binary actually used. No compiler
@@ -347,8 +349,52 @@ The three unfolding lemmas `swapReserveX`, `swapReserveY` and
 `swapTotalLP` state the three components of `swap PARAMS p dx hdx`, and
 `refl F TERM` proves each one. Probe P3 is green: the delta step of the
 reducible constructor and the iota step of the projection match both
-fire. M3c may therefore state its theorems on `swap PARAMS p dx hdx` and
-reduce them to the components.
+fire. M3c states its theorems on `swap PARAMS p dx hdx` and on
+`swapWithFee PARAMS p dx hdx f` directly, and it cites none of the three
+unfolding lemmas.
+
+## The constant product and the no-drain property
+
+Two files hold the ten theorems that M3c ports. `src/Product.tot` holds
+the four remaining theorems of `AmmLean/Invariant.lean`, and
+`src/NoDrain.tot` holds the six theorems of `AmmLean/NoDrain.lean`. The
+split follows the Lean side, where `NoDrain.lean` imports
+`AmmLean.Invariant`. There are two files and not one, because
+`src/Invariant.tot` already holds the pilot theorem
+`swap_output_identity`, which is the fifth theorem of `Invariant.lean`.
+`src/Product.tot` comes before `src/NoDrain.tot` in the check order,
+because `constantProductLowerBound` cites `swapPreservesProduct` and
+`swapOutputWithFeeLtReserveY` cites `effectiveInputPos`.
+
+| Lean name | tot name | Lean line | Mathlib lemmas | tot lemmas or axiom fields | transports |
+| --- | --- | --- | --- | --- | --- |
+| `swap_preserves_product` | `swapPreservesProduct` | 68 | `kan_exact` | `swapOutputIdentityOf` | 0 |
+| `effectiveInput_lt` | `effectiveInputLt` | 77 | `mul_lt_of_lt_one_right` | `mulLtOfLtOneRight`, `feeComplementLtOne` | 0 |
+| `effectiveInput_pos` | `effectiveInputPos` | 84 | `mul_pos` | axiom field `mulPos`, `feeComplementPos` | 0 |
+| `swap_with_fee_increases_product` | `swapWithFeeIncreasesProduct` | 106 | `mul_pos`, `mul_lt_of_lt_one_right`, `add_lt_add_iff_left`, `sub_pos`, `div_lt_iff`, `mul_add`, `lt_add_of_pos_left`, `mul_lt_mul_of_pos_right` | axiom field `addLtAddLeft`, `mulLtMulOfPosRight`, `swapOutputIdentityOf`, `swapWithFeeHy` | 1 |
+| `swap_output_lt_reserveY` | `swapOutputLtReserveY` | 56 | `div_lt_iff`, `mul_add`, `lt_add_of_pos_left`, `mul_pos` | `divLtOfLtMul`, `ltAddOfPosLeft`, `reserveXAddPos`, axiom fields `mulPos` and `mulAdd` | 1 |
+| `swap_output_pos` | `swapOutputPos` | 67 | `div_pos`, `mul_pos`, `add_pos` | `divPos`, `reserveXAddPos`, axiom field `mulPos` | 0 |
+| `swap_output_with_fee_lt_reserveY` | `swapOutputWithFeeLtReserveY` | 76 | `div_lt_iff`, `mul_add`, `lt_add_of_pos_left`, `mul_pos` | `divLtOfLtMul`, `ltAddOfPosLeft`, `deriveAddPos`, `effectiveInputPos`, axiom fields `mulPos` and `mulAdd` | 1 |
+| `reserveY_pos_after_swap` | `reserveYPosAfterSwap` | 90 | `sub_pos.mpr` | `subPosOfLt` | 0 |
+| `reserveY_pos_after_swap_with_fee` | `reserveYPosAfterSwapWithFee` | 95 | `sub_pos.mpr` | `subPosOfLt` | 0 |
+| `constant_product_lower_bound` | `constantProductLowerBound` | 113 | `le_of_eq`, `Eq.symm` | `leOfEq`, `sym0` | 0 |
+
+The Lean line is the line of the `theorem` keyword in the Lean file. The
+transports column counts the `subst0` occurrences of the tot proof.
+
+The theorems are stated on the constructors directly. A statement names
+`swap PARAMS p dx hdx` or `swapWithFee PARAMS p dx hdx f`, and the
+checker unfolds it, because the delta step of the reducible constructor
+and the iota step of the projection match both fire in conversion. The
+three unfolding lemmas of M3b, `swapReserveX`, `swapReserveY` and
+`swapTotalLP`, are therefore not cited by any theorem of M3c.
+
+`reserveYPosAfterSwap` has the type of `swapHy` of `src/Basic.tot`. It
+keeps the structure of the Lean proof, which applies `sub_pos.mpr` to
+`swap_output_lt_reserveY`, and it does not cite `swapHy`.
+`swapOutputLtReserveY` is the inner chain of `swapHy` without its outer
+`subPosOfLt`, and `swapOutputWithFeeLtReserveY` is the inner chain of
+`swapWithFeeHy` without its outer `subPosOfLt`.
 
 ## Measurement
 
@@ -432,8 +478,56 @@ two `sym0` are the symmetric forms of `mulAdd` in the first two of them.
 No def of either file holds a `trans0` or a `cong0`, because no
 obligation chains two equalities.
 
-`test/check.py` runs in about 2.7 seconds of wall time on the pinned
-checker, for all sixty-seven cases.
+`AmmLean/Invariant.lean` and `AmmLean/NoDrain.lean` against the two files
+that port their ten theorems.
+
+| Quantity | `AmmLean/Invariant.lean` | `src/Product.tot` | `AmmLean/NoDrain.lean` | `src/NoDrain.tot` |
+| --- | --- | --- | --- | --- |
+| Lines | 126 | 105 | 117 | 173 |
+| Theorems | 5 | 4 | 6 | 6 |
+
+`AmmLean/Invariant.lean` holds five theorems, and the pilot ported one of
+them, `swap_output_identity` at line 56. `src/Product.tot` holds the
+other four, and `src/NoDrain.tot` holds all six theorems of
+`AmmLean/NoDrain.lean`. Every def of both files is a plain def, because
+no statement of M3c reads the unfolding of an M3c def.
+
+The four theorems of `AmmLean/Invariant.lean` that `src/Product.tot`
+ports hold 28 Lean lines, and the four tot defs hold 82 lines without
+their four `check` lines, which is 2.9 times the Lean text. The six
+theorems of `AmmLean/NoDrain.lean` hold 27 Lean lines, and the six tot
+defs hold 144 lines without their six `check` lines, which is 5.3 times
+the Lean text. Blank lines, comment lines and doc comments are excluded
+from all four counts. The pilot theorem costs 55 tot lines in its record
+form against 5 Lean lines, which is 11 times the Lean text, so the
+per-theorem overhead falls once the libraries exist. That is the
+question of Next milestone 2 above.
+
+M3c adds no library lemma and no axiom. Every lemma that the ten
+theorems cite is a lemma that M2, M3a or M3b already proved, and every
+axiom field that they name is one of the seventeen axioms of
+`OrderedField`.
+
+The two files of M3c, in proof-term occurrences. Comment lines are
+excluded from the counts.
+
+| file | lines | `trans0` | `cong0` | `sym0` | `subst0` |
+| --- | --- | --- | --- | --- | --- |
+| `src/Product.tot` | 105 | 0 | 0 | 0 | 1 |
+| `src/NoDrain.tot` | 173 | 0 | 0 | 3 | 2 |
+
+The one `subst0` of `src/Product.tot` is the transport of
+`swapWithFeeIncreasesProduct` along `swapOutputIdentityOf`. The two
+`subst0` of `src/NoDrain.tot` are the transports of
+`swapOutputLtReserveY` and of `swapOutputWithFeeLtReserveY` along the
+symmetric form of the axiom field `mulAdd`, and the two `sym0` of those
+two defs build that symmetric form. The third `sym0` is the symmetric
+form of `swapPreservesProduct` inside `constantProductLowerBound`. No
+def of either file holds a `trans0` or a `cong0`, because no theorem
+chains two equalities.
+
+`test/check.py` runs in about 2.4 seconds of wall time on the pinned
+checker, for all eighty cases.
 
 ## Scope and trust
 
@@ -455,16 +549,17 @@ is excluded, including its unrelated IO-law axioms. Checking trusts
 tot's current elaborator and kernel. This project does not establish
 their metatheoretic soundness.
 
-The port covers one theorem, in two forms, and the eight theorems of
-`AmmLean/Basic.lean`. The other twenty-two theorems of
-amm-lean are not ported. The order and fraction library holds thirty-six
+The port covers one theorem, in two forms, the eight theorems of
+`AmmLean/Basic.lean`, the four remaining theorems of
+`AmmLean/Invariant.lean` and the six theorems of `AmmLean/NoDrain.lean`.
+The other twelve theorems of amm-lean are not ported. The order and fraction library holds thirty-six
 lemmas that those theorems cite. It declares no axiom of its own: every
 lemma is a def with a proof term, and the only new hypotheses are the
 three fields that the record gained.
 
 ## Validation
 
-On 2026-09-06, all sixty-seven checks passed with checker SHA-256
+On 2026-09-06, all eighty checks passed with checker SHA-256
 `30c4524d57f6723e39ba117097222f3ab8ef3e899a8a4af8b7e60c68337842bf` at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe`,
 built from tot commit `8cf0b8b` with a clean tree. Build that commit to
@@ -473,7 +568,7 @@ reproduce the reference checker.
 The checker reports every rejection in this repository with the word
 `mismatch`, except the axiom case, which reports `axiom`.
 
-The sixty-seven checks:
+The eighty checks:
 
 - The theorem checks without a prelude or axioms.
 - The proof is rejected against a commuted right side, `fmul y x`.
@@ -549,8 +644,34 @@ The sixty-seven checks:
   `hx : flt fzero totalLP` and is rejected at `constantProductPos`, and
   `weak-feerate-hlt` states `hlt : flt fone rate` and is rejected at
   `feeComplementPos`.
+- Ten checks, one for each theorem of `src/Product.tot` and
+  `src/NoDrain.tot`. Each check changes the result type of the theorem
+  and keeps the proof, so each one is rejected at its own def:
+  `wrong-swap-preserves-product` at `swapPreservesProduct`,
+  `wrong-effectiveinput-lt` at `effectiveInputLt`,
+  `wrong-effectiveinput-pos` at `effectiveInputPos`,
+  `wrong-swapwithfee-increases-product` at
+  `swapWithFeeIncreasesProduct`,
+  `wrong-swapoutput-lt-reservey` at `swapOutputLtReserveY`,
+  `wrong-swapoutput-pos` at `swapOutputPos`,
+  `wrong-swapoutputwithfee-lt-reservey` at
+  `swapOutputWithFeeLtReserveY`,
+  `wrong-reservey-pos-after-swap` at `reserveYPosAfterSwap`,
+  `wrong-reservey-pos-after-swapwithfee` at
+  `reserveYPosAfterSwapWithFee` and
+  `wrong-constantproduct-lowerbound` at `constantProductLowerBound`.
+- Three checks keep the statement and break the proof, so each one is
+  rejected at its own def: `wrong-swap-preserves-product-proof`
+  exchanges the two reserves in the term of `swapPreservesProduct` and
+  is rejected at `swapPreservesProduct`,
+  `wrong-increases-product-notransport` removes the `subst0` wrapper of
+  `swapWithFeeIncreasesProduct` and is rejected at
+  `swapWithFeeIncreasesProduct`, and `wrong-lowerbound-nosym` removes
+  the `sym0` of `constantProductLowerBound` and is rejected at
+  `constantProductLowerBound`.
 
-For the thirty-six checks that M3a and M3b add, the runner also reads
+For the forty-nine checks that M3a, M3b and M3c add, the runner also
+reads
 the position
 of the diagnostic and confirms the name of the first failing def. A
 mutation that moves the rejection to another def fails the case. Each
@@ -573,10 +694,10 @@ above.
 
 ## Probe results
 
-Fourteen facts about tot, found with scratch files. The first five come
-from the record milestone, the next five come from the M3a probes and
-the last four come from the M3b probes. The
-scratch files are not part of this repository.
+Sixteen facts about tot, found with scratch files. The first five come
+from the record milestone, the next five come from the M3a probes, the
+next four come from the M3b probes and the last two come from the M3c
+probes. The scratch files are not part of this repository.
 
 - A data record that bundles the eight field laws checks when the law
   fields carry quantity w. When the fields carry quantity 0 and a def
@@ -634,23 +755,38 @@ scratch files are not part of this repository.
   `subst0` along `sym0` of `mulAdd`, and `ltAddOfPosLeft` over
   `mulPos`. It is the archetype of `swapWithFeeHy`, `removeLiquidityHx`
   and `removeLiquidityHy`.
+- A theorem may be stated on a reducible constructor and unfolded by
+  conversion alone. `swapPreservesProduct` states
+  `Eq F (constantProduct OPS (swap PARAMS p dx hdx)) (constantProduct OPS p)`,
+  and `swapOutputIdentityOf` alone proves it. No unfolding lemma is
+  cited and no transport is written. The control exchanges the two
+  endpoints of the `Eq` and the checker rejects it with a type
+  mismatch.
+- `leOfEq` accepts a `sym0` between two constant products in its w
+  slot, and `fle` unfolds inside the statement.
+  `constantProductLowerBound` states
+  `fle F flt (constantProduct OPS p) (constantProduct OPS (swap PARAMS p dx hdx))`
+  and cites `leOfEq` over `sym0` of `swapPreservesProduct`. The control
+  removes the `sym0` and passes the proof of `swapPreservesProduct`
+  straight into `leOfEq`, and the checker rejects it.
+
+The five M3c probes Q1 to Q5 were all green on the first attempt, so
+they forced no change to any statement and no change to any term of the
+design notes.
 
 ## Next milestones
 
-1. M3c: the four theorems of `AmmLean/Invariant.lean` and the six
-   theorems of `AmmLean/NoDrain.lean`, stated on the four constructors
-   through the three unfolding lemmas.
-2. M3d: the five theorems of `AmmLean/PriceImpact.lean` and the seven
-   theorems of `AmmLean/Liquidity.lean`. M3c and M3d together port
-   the other twenty-two theorems of amm-lean. Measure whether the
-   per-theorem overhead falls once the record, the derivation library
-   and the order and fraction library exist.
-3. Supply a concrete carrier: an inhabitant of `OrderedField` for one
+1. M3d: the five theorems of `AmmLean/PriceImpact.lean` and the seven
+   theorems of `AmmLean/Liquidity.lean`. M3c ported ten theorems, and
+   M3d ports the remaining twelve theorems of amm-lean. Measure whether
+   the per-theorem overhead falls further once the record, the
+   derivation library and the order and fraction library exist.
+2. Supply a concrete carrier: an inhabitant of `OrderedField` for one
    type, so that both theorems have a closed instance. tot has no
    rationals, so the carrier is a milestone of its own.
 
-Sources, thirteen files: `src/Foundation.tot`, `src/Field.tot`,
+Sources, fifteen files: `src/Foundation.tot`, `src/Field.tot`,
 `src/Invariant.tot`, `src/Axioms.tot`, `src/Ring.tot`, `src/Laws.tot`,
 `src/Compose.tot`, `src/Frac.tot`, `src/Order.tot`, `src/Pool.tot`,
-`src/Basic.tot`, `test/check.py`, `README.md`. The first eleven are the
-check order.
+`src/Basic.tot`, `src/Product.tot`, `src/NoDrain.tot`, `test/check.py`,
+`README.md`. The first thirteen are the check order.

@@ -1,0 +1,105 @@
+-- The constant product theorems of AmmLean/Invariant.lean, stated on the
+-- constructors swap and swapWithFee of src/Basic.tot.
+-- swap_output_identity itself is not here: it is the pilot, and it lives in
+-- src/Invariant.tot and src/Compose.tot.
+-- Every theorem is a plain def over the eleven parameters, because no
+-- statement in M3c reads the unfolding of an M3c def.
+-- The statements name swap and swapWithFee directly. Both are reducible
+-- defs whose bodies are one pool constructor application, so delta of the
+-- constructor and iota of the projection match unfold them in conversion,
+-- and no unfolding lemma has to be cited.
+-- The check lines stand at the end of the file, one for each def.
+
+def swapPreservesProduct :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (p : Pool F fzero flt) -> (dx : F) -> (hdx : flt fzero dx) ->
+  Eq F
+    (constantProduct F fadd fmul fsub fdiv fneg finv fzero fone flt
+      (swap F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx))
+    (constantProduct F fadd fmul fsub fdiv fneg finv fzero fone flt p) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx =>
+    swapOutputIdentityOf F fadd fmul fsub fdiv fneg finv fzero fone flt A
+      (poolReserveX F fzero flt p) (poolReserveY F fzero flt p) dx
+      (poolHx F fzero flt p) hdx
+
+check swapPreservesProduct
+
+def effectiveInputLt :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (dx : F) -> (hdx : flt fzero dx) -> (f : FeeRate F fzero fone flt) ->
+  flt (effectiveInput F fadd fmul fsub fdiv fneg finv fzero fone flt dx f) dx :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A dx hdx f =>
+    mulLtOfLtOneRight F fadd fmul fsub fdiv fneg finv fzero fone flt A dx
+      (feeComplement F fadd fmul fsub fdiv fneg finv fzero fone flt f) hdx
+      (feeComplementLtOne F fadd fmul fsub fdiv fneg finv fzero fone flt A f)
+
+check effectiveInputLt
+
+def effectiveInputPos :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (dx : F) -> (hdx : flt fzero dx) -> (f : FeeRate F fzero fone flt) ->
+  flt fzero (effectiveInput F fadd fmul fsub fdiv fneg finv fzero fone flt dx f) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A dx hdx f =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      mulPos dx (feeComplement F fadd fmul fsub fdiv fneg finv fzero fone flt f) hdx
+        (feeComplementPos F fadd fmul fsub fdiv fneg finv fzero fone flt A f)
+    end
+
+check effectiveInputPos
+
+def swapWithFeeIncreasesProduct :
+  (0 F : Type 0) ->
+  (fadd : F -> F -> F) -> (fmul : F -> F -> F) -> (fsub : F -> F -> F) -> (fdiv : F -> F -> F) ->
+  (fneg : F -> F) -> (finv : F -> F) -> (fzero : F) -> (fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (A : OrderedField F fadd fmul fsub fdiv fneg finv fzero fone flt) ->
+  (p : Pool F fzero flt) -> (dx : F) -> (hdx : flt fzero dx) ->
+  (f : FeeRate F fzero fone flt) ->
+  flt
+    (constantProduct F fadd fmul fsub fdiv fneg finv fzero fone flt p)
+    (constantProduct F fadd fmul fsub fdiv fneg finv fzero fone flt
+      (swapWithFee F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx f)) :=
+  fun F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx f =>
+    match A with
+    | orderedField addComm addAssoc addZero addNegCancel mulComm mulAssoc mulOne mulAdd subEqAddNeg divEqMulInv mulInvCancel ltIrrefl ltTrans addLtAddLeft mulPos ltTrichotomy zeroNeOne =>
+      subst0 F
+        (fmul
+          (fadd (poolReserveX F fzero flt p)
+            (effectiveInput F fadd fmul fsub fdiv fneg finv fzero fone flt dx f))
+          (fsub (poolReserveY F fzero flt p)
+            (swapOutputWithFee F fadd fmul fsub fdiv fneg finv fzero fone flt p dx f)))
+        (fmul (poolReserveX F fzero flt p) (poolReserveY F fzero flt p))
+        (fun z =>
+          flt z
+            (fmul (fadd (poolReserveX F fzero flt p) dx)
+              (fsub (poolReserveY F fzero flt p)
+                (swapOutputWithFee F fadd fmul fsub fdiv fneg finv fzero fone flt p dx f))))
+        (swapOutputIdentityOf F fadd fmul fsub fdiv fneg finv fzero fone flt A
+          (poolReserveX F fzero flt p)
+          (poolReserveY F fzero flt p)
+          (effectiveInput F fadd fmul fsub fdiv fneg finv fzero fone flt dx f)
+          (poolHx F fzero flt p)
+          (effectiveInputPos F fadd fmul fsub fdiv fneg finv fzero fone flt A dx hdx f))
+        (mulLtMulOfPosRight F fadd fmul fsub fdiv fneg finv fzero fone flt A
+          (fadd (poolReserveX F fzero flt p)
+            (effectiveInput F fadd fmul fsub fdiv fneg finv fzero fone flt dx f))
+          (fadd (poolReserveX F fzero flt p) dx)
+          (fsub (poolReserveY F fzero flt p)
+            (swapOutputWithFee F fadd fmul fsub fdiv fneg finv fzero fone flt p dx f))
+          (addLtAddLeft (poolReserveX F fzero flt p)
+            (effectiveInput F fadd fmul fsub fdiv fneg finv fzero fone flt dx f)
+            dx
+            (effectiveInputLt F fadd fmul fsub fdiv fneg finv fzero fone flt A dx hdx f))
+          (swapWithFeeHy F fadd fmul fsub fdiv fneg finv fzero fone flt A p dx hdx f))
+    end
+
+check swapWithFeeIncreasesProduct

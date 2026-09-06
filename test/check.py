@@ -12,7 +12,7 @@ DEFAULT_TOT = Path("/Users/oobi/Documents/kan-lang-tot-pin/"
                    "_build/default/bin/tot.exe")
 TOT = Path(os.environ.get("TOT", DEFAULT_TOT))
 NAMES = ["Foundation", "Field", "Invariant", "Axioms", "Ring", "Laws",
-         "Compose", "Frac", "Order", "Pool", "Basic"]
+         "Compose", "Frac", "Order", "Pool", "Basic", "Product", "NoDrain"]
 FILES = {name: (ROOT / "src" / f"{name}.tot").read_text() for name in NAMES}
 FIELD = FILES["Field"]
 INVARIANT = FILES["Invariant"]
@@ -23,7 +23,7 @@ ORDER = FILES["Order"]
 POOL = FILES["Pool"]
 
 def concatenate(**changed):
-    """Return the eleven sources in check order, with the named ones replaced."""
+    """Return the thirteen sources in check order, with the named ones replaced."""
     return "\n".join(changed.get(name, FILES[name]) for name in NAMES)
 
 BASE = concatenate()
@@ -355,6 +355,122 @@ FEERATE_HLT = [
      "match f as g return flt fone (feeRateRate F fzero fone flt g) with"),
 ]
 
+# The thirteen negatives of src/Product.tot and src/NoDrain.tot that M3c
+# adds: (case, file, def, old, new, failing def). The first ten change
+# the result type of a theorem and keep the proof, so the def itself
+# fails. The last three keep the statement and break the proof: one
+# permutes the two reserves, one drops the transport and one drops the
+# symmetry step.
+M3C_NEGATIVES = [
+    ("wrong-swap-preserves-product", "Product", "swapPreservesProduct",
+     f"""  Eq F
+    (constantProduct {OPS}
+      (swap {OPS} A p dx hdx))
+    (constantProduct {OPS} p) :=""",
+     f"""  Eq F
+    (constantProduct {OPS} p)
+    (constantProduct {OPS}
+      (swap {OPS} A p dx hdx)) :=""",
+     "swapPreservesProduct"),
+    ("wrong-effectiveinput-lt", "Product", "effectiveInputLt",
+     f"  flt (effectiveInput {OPS} dx f) dx :=",
+     f"  flt dx (effectiveInput {OPS} dx f) :=",
+     "effectiveInputLt"),
+    ("wrong-effectiveinput-pos", "Product", "effectiveInputPos",
+     f"  flt fzero (effectiveInput {OPS} dx f) :=",
+     f"  flt (effectiveInput {OPS} dx f) fzero :=",
+     "effectiveInputPos"),
+    ("wrong-swapwithfee-increases-product", "Product",
+     "swapWithFeeIncreasesProduct",
+     f"""  flt
+    (constantProduct {OPS} p)
+    (constantProduct {OPS}
+      (swapWithFee {OPS} A p dx hdx f)) :=""",
+     f"""  flt
+    (constantProduct {OPS}
+      (swapWithFee {OPS} A p dx hdx f))
+    (constantProduct {OPS} p) :=""",
+     "swapWithFeeIncreasesProduct"),
+    ("wrong-swapoutput-lt-reservey", "NoDrain", "swapOutputLtReserveY",
+     f"  flt (swapOutput {OPS} p dx) {RY} :=",
+     f"  flt {RY} (swapOutput {OPS} p dx) :=",
+     "swapOutputLtReserveY"),
+    ("wrong-swapoutput-pos", "NoDrain", "swapOutputPos",
+     f"  flt fzero (swapOutput {OPS} p dx) :=",
+     f"  flt (swapOutput {OPS} p dx) fzero :=",
+     "swapOutputPos"),
+    ("wrong-swapoutputwithfee-lt-reservey", "NoDrain",
+     "swapOutputWithFeeLtReserveY",
+     f"""  flt (swapOutputWithFee {OPS} p dx f)
+    {RY} :=""",
+     f"""  flt {RY}
+    (swapOutputWithFee {OPS} p dx f) :=""",
+     "swapOutputWithFeeLtReserveY"),
+    ("wrong-reservey-pos-after-swap", "NoDrain", "reserveYPosAfterSwap",
+     f"""  flt fzero
+    (fsub {RY}
+      (swapOutput {OPS} p dx)) :=""",
+     f"""  flt fzero
+    (fsub (swapOutput {OPS} p dx)
+      {RY}) :=""",
+     "reserveYPosAfterSwap"),
+    ("wrong-reservey-pos-after-swapwithfee", "NoDrain",
+     "reserveYPosAfterSwapWithFee",
+     f"""  flt fzero
+    (fsub {RY}
+      (swapOutputWithFee {OPS} p dx f)) :=""",
+     f"""  flt fzero
+    (fsub (swapOutputWithFee {OPS} p dx f)
+      {RY}) :=""",
+     "reserveYPosAfterSwapWithFee"),
+    ("wrong-constantproduct-lowerbound", "NoDrain",
+     "constantProductLowerBound",
+     f"""  fle F flt
+    (constantProduct {OPS} p)
+    (constantProduct {OPS}
+      (swap {OPS} A p dx hdx)) :=""",
+     f"""  fle F flt
+    (constantProduct {OPS}
+      (swap {OPS} A p dx hdx))
+    (constantProduct {OPS} p) :=""",
+     "constantProductLowerBound"),
+    ("wrong-swap-preserves-product-proof", "Product", "swapPreservesProduct",
+     f"      {RX} {RY} dx",
+     f"      {RY} {RX} dx",
+     "swapPreservesProduct"),
+    ("wrong-increases-product-notransport", "Product",
+     "swapWithFeeIncreasesProduct",
+     f"""      subst0 F
+        (fmul
+          (fadd {RX}
+            (effectiveInput {OPS} dx f))
+          (fsub {RY}
+            (swapOutputWithFee {OPS} p dx f)))
+        (fmul {RX} {RY})
+        (fun z =>
+          flt z
+            (fmul (fadd {RX} dx)
+              (fsub {RY}
+                (swapOutputWithFee {OPS} p dx f))))
+        (swapOutputIdentityOf {OPS} A
+          {RX}
+          {RY}
+          (effectiveInput {OPS} dx f)
+          (poolHx F fzero flt p)
+          (effectiveInputPos {OPS} A dx hdx f))
+""",
+     "",
+     "swapWithFeeIncreasesProduct"),
+    ("wrong-lowerbound-nosym", "NoDrain", "constantProductLowerBound",
+     f"""      (sym0 F
+        (constantProduct {OPS}
+          (swap {OPS} A p dx hdx))
+        (constantProduct {OPS} p)
+        (swapPreservesProduct {OPS} A p dx hdx))""",
+     f"      (swapPreservesProduct {OPS} A p dx hdx)",
+     "constantProductLowerBound"),
+]
+
 # A case is (name, full source, expected diagnostic word).
 # None: the checker must accept. A string: the checker must exit with
 # status 1 and print that string in its diagnostic.
@@ -412,7 +528,10 @@ CASES = [
      for name, def_name, old, new, _failing in BASIC_NEGATIVES] + [
     ("weak-pool-hx", mutate_pool(POOL_HX), "mismatch"),
     ("weak-feerate-hlt", mutate_pool(FEERATE_HLT), "mismatch"),
-]
+    # The ten result-type negatives and the three proof negatives of
+    # src/Product.tot and src/NoDrain.tot that M3c adds.
+] + [(name, mutate_in_def(file_name, def_name, old, new), "mismatch")
+     for name, file_name, def_name, old, new, _failing in M3C_NEGATIVES]
 
 # The def that must fail first, for every case that M3a adds. The name
 # comes from the position of the diagnostic, so a mutation that moves the
@@ -429,6 +548,8 @@ FAILING_DEFS = {
        for name, _def_name, _old, _new, failing in BASIC_NEGATIVES},
     "weak-pool-hx": "constantProductPos",
     "weak-feerate-hlt": "feeComplementPos",
+    **{name: failing
+       for name, _file, _def_name, _old, _new, failing in M3C_NEGATIVES},
 }
 
 def failing_def(source, result):
