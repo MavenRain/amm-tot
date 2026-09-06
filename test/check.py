@@ -10,77 +10,93 @@ DEFAULT_TOT = Path("/Users/oobi/Documents/kan-lang-tot-pin/"
                    "_build/default/bin/tot.exe")
 TOT = Path(os.environ.get("TOT", DEFAULT_TOT))
 FOUNDATION = (ROOT / "src" / "Foundation.tot").read_text()
+FIELD = (ROOT / "src" / "Field.tot").read_text()
 INVARIANT = (ROOT / "src" / "Invariant.tot").read_text()
-BASE = FOUNDATION + "\n" + INVARIANT
+BASE = FOUNDATION + "\n" + FIELD + "\n" + INVARIANT
 
 GOAL = ("  Eq F (fmul (fadd x dx) (fsub y (fdiv (fmul y dx) (fadd x dx))))"
         " (fmul x y) :=\n")
 COMMUTED = GOAL.replace("(fmul x y) :=", "(fmul y x) :=")
 WRONG_DEN = GOAL.replace("(fdiv (fmul y dx) (fadd x dx))))",
                          "(fdiv (fmul y dx) x)))")
-LAST_STEP = """    (trans0 F
-      (fsub (fadd (fmul x y) (fmul dx y)) (fmul y dx))
-      (fsub (fadd (fmul x y) (fmul dx y)) (fmul dx y))
-      (fmul x y)
-      (cong0 F F
-        (fmul y dx)
-        (fmul dx y)
-        (fun z => fsub (fadd (fmul x y) (fmul dx y)) z)
-        (mulComm y dx))
-      (addSubCancelRight (fmul x y) (fmul dx y))))))
+LAST_STEP = """      (trans0 F
+        (fsub (fadd (fmul x y) (fmul dx y)) (fmul y dx))
+        (fsub (fadd (fmul x y) (fmul dx y)) (fmul dx y))
+        (fmul x y)
+        (cong0 F F
+          (fmul y dx)
+          (fmul dx y)
+          (fun z => fsub (fadd (fmul x y) (fmul dx y)) z)
+          (mulComm y dx))
+        (addSubCancelRight (fmul x y) (fmul dx y))))))
 """
-NO_LAST_STEP = "      (addSubCancelRight (fmul x y) (fmul dx y)))))\n"
+NO_LAST_STEP = "        (addSubCancelRight (fmul x y) (fmul dx y)))))\n"
 
-# Each law line of the signature, and a weakened replacement for it.
+# Each law type of the record, and a weakened replacement for it. The
+# text occurs twice in Field.tot: once as the constructor field and once
+# as the return type of the projection. Both change together, so the
+# projection still checks and swapOutputIdentity is the first def that
+# fails.
 LAWS = [
     ("addPos",
-     "(0 addPos : (a : F) -> (b : F) -> (0 ha : flt fzero a) ->"
-     " (0 hb : flt fzero b) -> flt fzero (fadd a b)) ->",
-     "(0 addPos : (a : F) -> (b : F) -> (0 ha : flt fzero a) ->"
-     " (0 hb : flt fzero b) -> flt fzero a) ->"),
+     "flt fzero (fadd a b)",
+     "flt fzero a"),
     ("neOfGt",
-     "(0 neOfGt : (a : F) -> (0 h : flt fzero a) ->"
-     " (0 e : Eq F a fzero) -> Empty) ->",
-     "(0 neOfGt : (a : F) -> (0 h : flt fzero a) ->"
-     " (0 e : Eq F a a) -> Empty) ->"),
+     "(0 h : flt fzero a) -> (0 e : Eq F a fzero) -> Empty",
+     "(0 h : flt fzero a) -> (0 e : Eq F a a) -> Empty"),
     ("mulSub",
-     "Eq F (fmul a (fsub b c)) (fsub (fmul a b) (fmul a c))) ->",
-     "Eq F (fmul a (fsub b c)) (fmul a (fsub b c))) ->"),
+     "Eq F (fmul a (fsub b c)) (fsub (fmul a b) (fmul a c))",
+     "Eq F (fmul a (fsub b c)) (fmul a (fsub b c))"),
     ("mulDivAssoc",
-     "Eq F (fmul a (fdiv b c)) (fdiv (fmul a b) c)) ->",
-     "Eq F (fmul a (fdiv b c)) (fmul a (fdiv b c))) ->"),
+     "Eq F (fmul a (fdiv b c)) (fdiv (fmul a b) c)",
+     "Eq F (fmul a (fdiv b c)) (fmul a (fdiv b c))"),
     ("mulDivCancelLeft",
-     "Eq F (fdiv (fmul a b) a) b) ->",
-     "Eq F (fdiv (fmul a b) a) (fdiv (fmul a b) a)) ->"),
+     "Eq F (fdiv (fmul a b) a) b",
+     "Eq F (fdiv (fmul a b) a) (fdiv (fmul a b) a)"),
     ("addMul",
-     "Eq F (fmul (fadd a b) c) (fadd (fmul a c) (fmul b c))) ->",
-     "Eq F (fmul (fadd a b) c) (fmul (fadd a b) c)) ->"),
+     "Eq F (fmul (fadd a b) c) (fadd (fmul a c) (fmul b c))",
+     "Eq F (fmul (fadd a b) c) (fmul (fadd a b) c)"),
     ("mulComm",
-     "(0 mulComm : (a : F) -> (b : F) -> Eq F (fmul a b) (fmul b a)) ->",
-     "(0 mulComm : (a : F) -> (b : F) -> Eq F (fmul a b) (fmul a b)) ->"),
+     "Eq F (fmul a b) (fmul b a)",
+     "Eq F (fmul a b) (fmul a b)"),
     ("addSubCancelRight",
-     "Eq F (fsub (fadd a b) b) a) ->",
-     "Eq F (fsub (fadd a b) b) (fsub (fadd a b) b)) ->"),
+     "Eq F (fsub (fadd a b) b) a",
+     "Eq F (fsub (fadd a b) b) (fsub (fadd a b) b)"),
 ]
 
-def mutate(old, new):
+def mutate_invariant(old, new):
     """Return BASE with one exact substring of the invariant replaced."""
     if INVARIANT.count(old) != 1:
         raise SystemExit(f"anchor is not unique in Invariant.tot: {old!r}")
-    return FOUNDATION + "\n" + INVARIANT.replace(old, new)
+    return FOUNDATION + "\n" + FIELD + "\n" + INVARIANT.replace(old, new)
+
+def mutate_field(old, new, count):
+    """Return BASE with every occurrence of a record substring replaced.
+
+    The count is exact. It guards the paired edit of a constructor field
+    and the return type of its projection.
+    """
+    found = FIELD.count(old)
+    if found != count:
+        raise SystemExit(f"anchor occurs {found} times, not {count}, "
+                         f"in Field.tot: {old!r}")
+    return FOUNDATION + "\n" + FIELD.replace(old, new) + "\n" + INVARIANT
 
 # A case is (name, full source, expected diagnostic word).
 # None: the checker must accept. A string: the checker must exit with
 # status 1 and print that string in its diagnostic.
 CASES = [
     ("swap-output-identity", BASE, None),
-    ("commuted-rhs", mutate(GOAL, COMMUTED), "mismatch"),
-    ("wrong-denominator", mutate(GOAL, WRONG_DEN), "mismatch"),
-    ("dropped-step", mutate(LAST_STEP, NO_LAST_STEP), "mismatch"),
+    ("commuted-rhs", mutate_invariant(GOAL, COMMUTED), "mismatch"),
+    ("wrong-denominator", mutate_invariant(GOAL, WRONG_DEN), "mismatch"),
+    ("dropped-step", mutate_invariant(LAST_STEP, NO_LAST_STEP), "mismatch"),
     ("positivity-misused",
-     mutate("(addPos x dx hx hdx)", "(addPos x dx hx hx)"), "mismatch"),
-] + [(f"weak-{name}", mutate(old, new), "mismatch")
+     mutate_invariant("(addPos x dx hx hdx)", "(addPos x dx hx hx)"),
+     "mismatch"),
+] + [(f"weak-{name}", mutate_field(old, new, 2), "mismatch")
      for name, old, new in LAWS] + [
+    ("wrong-projection",
+     mutate_field("=> mulComm a b", "=> mulComm b a", 1), "mismatch"),
     ("axiom-rejected",
      BASE + "\naxiom fake : (0 F : Type 0) -> (a : F) -> (b : F) ->"
             " Eq F a b\n", "axiom"),
