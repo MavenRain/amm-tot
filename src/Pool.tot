@@ -1,0 +1,86 @@
+-- The two data records of AmmLean/Basic.lean: FeeRate and Pool.
+-- The parameters carry 0, because a data type parameter must. Pool takes
+-- F, fzero and flt only, and FeeRate takes F, fzero, fone and flt only:
+-- no operation of the field appears in either record type.
+-- The six Pool fields and the three FeeRate fields carry w, because a def
+-- projects each one into a w position.
+-- The nine projections are reducible def, because the three dependent
+-- proof projections read the unfoldings of the value projections, and
+-- because src/Basic.tot states its theorems on the projections.
+-- The check lines stand at the end of the file, one for each def.
+
+data FeeRate (0 F : Type 0) (0 fzero : F) (0 fone : F) (0 flt : F -> F -> Type 0) : Type 0 :=
+  | feeRate : (rate : F) -> (hpos : flt fzero rate) -> (hlt : flt rate fone) -> FeeRate F fzero fone flt
+
+data Pool (0 F : Type 0) (0 fzero : F) (0 flt : F -> F -> Type 0) : Type 0 :=
+  | pool : (reserveX : F) -> (reserveY : F) -> (totalLP : F) -> (hx : flt fzero reserveX) -> (hy : flt fzero reserveY) -> (hlp : flt fzero totalLP) -> Pool F fzero flt
+
+reducible def poolReserveX :
+  (0 F : Type 0) -> (0 fzero : F) -> (0 flt : F -> F -> Type 0) ->
+  (p : Pool F fzero flt) -> F :=
+  fun F fzero flt p => match p with | pool rx ry lp hx hy hlp => rx end
+
+reducible def poolReserveY :
+  (0 F : Type 0) -> (0 fzero : F) -> (0 flt : F -> F -> Type 0) ->
+  (p : Pool F fzero flt) -> F :=
+  fun F fzero flt p => match p with | pool rx ry lp hx hy hlp => ry end
+
+reducible def poolTotalLP :
+  (0 F : Type 0) -> (0 fzero : F) -> (0 flt : F -> F -> Type 0) ->
+  (p : Pool F fzero flt) -> F :=
+  fun F fzero flt p => match p with | pool rx ry lp hx hy hlp => lp end
+
+reducible def poolHx :
+  (0 F : Type 0) -> (0 fzero : F) -> (0 flt : F -> F -> Type 0) ->
+  (p : Pool F fzero flt) -> flt fzero (poolReserveX F fzero flt p) :=
+  fun F fzero flt p =>
+    match p as q return flt fzero (poolReserveX F fzero flt q) with
+    | pool rx ry lp hx hy hlp => hx
+    end
+
+reducible def poolHy :
+  (0 F : Type 0) -> (0 fzero : F) -> (0 flt : F -> F -> Type 0) ->
+  (p : Pool F fzero flt) -> flt fzero (poolReserveY F fzero flt p) :=
+  fun F fzero flt p =>
+    match p as q return flt fzero (poolReserveY F fzero flt q) with
+    | pool rx ry lp hx hy hlp => hy
+    end
+
+reducible def poolHlp :
+  (0 F : Type 0) -> (0 fzero : F) -> (0 flt : F -> F -> Type 0) ->
+  (p : Pool F fzero flt) -> flt fzero (poolTotalLP F fzero flt p) :=
+  fun F fzero flt p =>
+    match p as q return flt fzero (poolTotalLP F fzero flt q) with
+    | pool rx ry lp hx hy hlp => hlp
+    end
+
+reducible def feeRateRate :
+  (0 F : Type 0) -> (0 fzero : F) -> (0 fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (f : FeeRate F fzero fone flt) -> F :=
+  fun F fzero fone flt f => match f with | feeRate rate hpos hlt => rate end
+
+reducible def feeRateHpos :
+  (0 F : Type 0) -> (0 fzero : F) -> (0 fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (f : FeeRate F fzero fone flt) -> flt fzero (feeRateRate F fzero fone flt f) :=
+  fun F fzero fone flt f =>
+    match f as g return flt fzero (feeRateRate F fzero fone flt g) with
+    | feeRate rate hpos hlt => hpos
+    end
+
+reducible def feeRateHlt :
+  (0 F : Type 0) -> (0 fzero : F) -> (0 fone : F) -> (0 flt : F -> F -> Type 0) ->
+  (f : FeeRate F fzero fone flt) -> flt (feeRateRate F fzero fone flt f) fone :=
+  fun F fzero fone flt f =>
+    match f as g return flt (feeRateRate F fzero fone flt g) fone with
+    | feeRate rate hpos hlt => hlt
+    end
+
+check poolReserveX
+check poolReserveY
+check poolTotalLP
+check poolHx
+check poolHy
+check poolHlp
+check feeRateRate
+check feeRateHpos
+check feeRateHlt

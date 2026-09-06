@@ -1,7 +1,7 @@
 -- The swap identity against the axioms alone. The theorem of
 -- src/Invariant.tot takes one FieldLaws record. fieldLawsOf builds that
 -- record from one OrderedField record, so the composition takes the
--- fourteen axioms as its only hypothesis about the field.
+-- seventeen axioms as its only hypothesis about the field.
 -- The eight operations carry quantity w, because they flow into the w
 -- binders of fieldLawsOf and of swapOutputIdentity.
 def swapOutputIdentityOf :

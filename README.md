@@ -7,6 +7,8 @@ proof in tot, a language with no fields, no division, no tactics and no
 rewrite form. The theorem is proved twice: once against a record of the
 eight field laws that the Lean proof cites, and once against a record of
 seventeen ordered-field axioms, from which the eight laws are derived.
+The port also states the AMM itself: the two data records of
+`AmmLean/Basic.lean`, its nine definitions and its eight theorems.
 
 ## Check
 
@@ -18,8 +20,9 @@ Run from this directory. The runner uses the checker named by `TOT` when
 that variable is set. Otherwise it uses the pinned checker at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe` and
 stops with a message when that file is absent. The runner concatenates
-the nine source files, in the order of the Sources line at the end of
-this file, in temporary files and checks with `--no-prelude --no-axioms`. It prints the checker
+the eleven source files of `src`, in the order in which the Sources line
+at the end of
+this file names them, in temporary files and checks with `--no-prelude --no-axioms`. It prints the checker
 SHA-256, so validation identifies the binary actually used. No compiler
 rebuild is necessary when a built checker exists.
 
@@ -146,8 +149,8 @@ yet cite about thirty Mathlib order and fraction lemmas, among them
 record, because that record had no multiplication-order axiom, no
 totality and no `zero_ne_one`. The record now holds seventeen
 axioms, and two files derive every cited lemma from them. The comment in
-`src/Compose.tot` still says fourteen axioms, because M3a does not
-change that file.
+`src/Compose.tot` now says seventeen axioms, because M3b corrects that
+one word.
 
 `src/Frac.tot` holds the twelve `Eq` lemmas of the fraction library. It
 cites `src/Axioms.tot` and `src/Ring.tot`, and it cites nothing in
@@ -229,6 +232,124 @@ axioms: it takes the trichotomy of `fzero` and `fone`, it refutes the
 equality with `zeroNeOne`, and it refutes `flt fone fzero` with
 `mulPos` on `fneg fone` and `negMulNeg`.
 
+## The pool and the fee rate
+
+`src/Pool.tot` holds the two data records of `AmmLean/Basic.lean`.
+`Pool` takes the parameters `F`, `fzero` and `flt`, and it has the six
+fields `reserveX`, `reserveY`, `totalLP`, `hx : flt fzero reserveX`,
+`hy : flt fzero reserveY` and `hlp : flt fzero totalLP`. `FeeRate` takes
+the parameters `F`, `fzero`, `fone` and `flt`, and it has the three
+fields `rate`, `hpos : flt fzero rate` and `hlt : flt rate fone`. No
+operation of the field appears in either record type. The parameters
+carry quantity 0, because a data type parameter must. The nine fields
+carry quantity w, because a def projects each one into a w position.
+
+The nine projections are `poolReserveX`, `poolReserveY`, `poolTotalLP`,
+`poolHx`, `poolHy`, `poolHlp`, `feeRateRate`, `feeRateHpos` and
+`feeRateHlt`. Each one is a reducible def. One rule governs them: a
+dependent proof projection needs its value projection to be a reducible
+def. `poolHx` states `flt fzero (poolReserveX F fzero flt p)` and it
+projects through `match p as q return flt fzero (poolReserveX F fzero
+flt q) with`. That return type reduces against the field variables of
+the arm only when `poolReserveX` unfolds, so a plain `def poolReserveX`
+is rejected. The same rule holds for `poolHy`, `poolHlp`,
+`feeRateHpos` and `feeRateHlt`.
+
+`src/Basic.tot` holds the nine pure definitions. Each one is a reducible
+def over the ten operation parameters, and none of them takes the axiom
+record, because no pure definition needs an axiom. Each body reads the
+pool and the fee rate through the projections and never matches on the
+variable, because a match on a variable pool is stuck and blocks every
+later unfolding. The `let` bindings of `Basic.lean`, that is `dy`,
+`ein`, `mintedLP`, `dxOut` and `dyOut`, are inlined.
+
+| Lean name | tot name | `Basic.lean` line | `Basic.tot` line |
+| --- | --- | --- | --- |
+| `constantProduct` | `constantProduct` | 76 | 14 |
+| `swapOutput` | `swapOutput` | 92 | 24 |
+| `effectivePrice` | `effectivePrice` | 101 | 34 |
+| `spotPrice` | `spotPrice` | 109 | 44 |
+| `FeeRate.complement` | `feeComplement` | 146 | 54 |
+| `effectiveInput` | `effectiveInput` | 161 | 64 |
+| `swapOutputWithFee` | `swapOutputWithFee` | 169 | 74 |
+| `redeemX` | `redeemX` | 226 | 84 |
+| `redeemY` | `redeemY` | 232 | 94 |
+
+The eight theorems of `Basic.lean` follow. Each one is a plain def over
+the eleven parameters, and each one cites one axiom field or one lemma
+of the library.
+
+| Lean name | tot name | Mathlib lemma | library lemma |
+| --- | --- | --- | --- |
+| `constantProduct_pos`, line 79 | `constantProductPos` | `mul_pos` | axiom field `mulPos` |
+| `FeeRate.complement_pos`, line 148 | `feeComplementPos` | `sub_pos.mpr` | `subPosOfLt` |
+| `FeeRate.complement_lt_one`, line 151 | `feeComplementLtOne` | `sub_lt_self` | `subLtSelf` |
+| `Pool.reserveX_ne_zero`, line 265 | `poolReserveXNeZero` | `ne_of_gt` | `deriveNeOfGt` |
+| `Pool.reserveY_ne_zero`, line 269 | `poolReserveYNeZero` | `ne_of_gt` | `deriveNeOfGt` |
+| `Pool.totalLP_ne_zero`, line 273 | `poolTotalLPNeZero` | `ne_of_gt` | `deriveNeOfGt` |
+| `reserveX_add_pos`, line 277 | `reserveXAddPos` | `add_pos` | `deriveAddPos` |
+| `reserveX_add_ne_zero`, line 282 | `reserveXAddNeZero` | `ne_of_gt` | `deriveNeOfGt` |
+
+A nonzero statement is written inline as `(0 e : Eq F x fzero) -> Empty`,
+and `deriveNeOfGt` takes the positivity proof, so each of the four
+nonzero theorems is one partial application with two arguments.
+
+Lean proves the positivity of each new field inline, inside the four
+structure literals of `swap`, `swapWithFee`, `addLiquidity` and
+`removeLiquidity`. tot proves each one as a named def, so that the four
+constructors stay match-free. There are ten positivity obligations, not
+eleven, because `swap` and `swapWithFee` carry the LP proof through
+unchanged. The chain length counts the `trans0` steps and the `subst0`
+steps of the proof term.
+
+| Lean site | tot name | chain length |
+| --- | --- | --- |
+| `swap.hx`, line 117 | `swapHx` | 0 `trans0`, 0 `subst0` |
+| `swap.hy`, line 117 | `swapHy` | 0 `trans0`, 1 `subst0` |
+| `swapWithFee.hx`, line 182 | `swapWithFeeHx` | 0 `trans0`, 0 `subst0` |
+| `swapWithFee.hy`, line 182 | `swapWithFeeHy` | 0 `trans0`, 1 `subst0` |
+| `addLiquidity.hx`, line 208 | `addLiquidityHx` | 0 `trans0`, 0 `subst0` |
+| `addLiquidity.hy`, line 208 | `addLiquidityHy` | 0 `trans0`, 0 `subst0` |
+| `addLiquidity.hlp`, line 208 | `addLiquidityHlp` | 0 `trans0`, 0 `subst0` |
+| `removeLiquidity.hx`, line 243 | `removeLiquidityHx` | 0 `trans0`, 1 `subst0` |
+| `removeLiquidity.hy`, line 243 | `removeLiquidityHy` | 0 `trans0`, 1 `subst0` |
+| `removeLiquidity.hlp`, line 243 | `removeLiquidityHlp` | 0 `trans0`, 0 `subst0` |
+
+The three obligations with no transport cite `reserveXAddPos` and
+nothing else. `addLiquidityHy` and `addLiquidityHlp` hold four library
+calls each over the axiom field `mulPos`, that is `divPos`, `leOfLt`,
+`leAddOfNonnegRight` and `ltOfLtOfLe`. `swapHy` and `swapWithFeeHy` each
+transport one endpoint along `sym0` of `mulAdd`, and
+`removeLiquidityHx` and `removeLiquidityHy` each transport one endpoint
+along `mulComm`, which already points the right way.
+
+The four constructors are reducible defs with match-free bodies. Each
+body is one `pool` application with the three data parameters given
+explicitly.
+
+- `swap` computes `fadd rx dx` and `fsub ry (swapOutput OPS p dx)` and
+  keeps `lpT`. It cites `swapHx`, `swapHy` and `poolHlp`.
+- `swapWithFee` computes `fadd rx dx` and
+  `fsub ry (swapOutputWithFee OPS p dx f)` and keeps `lpT`. It cites
+  `swapWithFeeHx`, `swapWithFeeHy` and `poolHlp`. The full `dx` is
+  deposited and the output is computed from the effective input.
+- `addLiquidity` computes `fadd rx dx`, `fadd ry (fdiv (fmul dx ry) rx)`
+  and `fadd lpT (fdiv (fmul dx lpT) rx)`. It cites `addLiquidityHx`,
+  `addLiquidityHy` and `addLiquidityHlp`.
+- `removeLiquidity` computes `fsub rx (redeemX OPS p lp)`,
+  `fsub ry (redeemY OPS p lp)` and `fsub lpT lp`. It cites
+  `removeLiquidityHx`, `removeLiquidityHy` and `removeLiquidityHlp`.
+
+Here `rx`, `ry` and `lpT` are the three value projections of `p`, and
+the files spell them out.
+
+The three unfolding lemmas `swapReserveX`, `swapReserveY` and
+`swapTotalLP` state the three components of `swap PARAMS p dx hdx`, and
+`refl F TERM` proves each one. Probe P3 is green: the delta step of the
+reducible constructor and the iota step of the projection match both
+fire. M3c may therefore state its theorems on `swap PARAMS p dx hdx` and
+reduce them to the components.
+
 ## Measurement
 
 | Quantity | Lean | tot, pilot | tot, record |
@@ -279,8 +400,40 @@ order and fraction library. The Lean side costs nothing here,
 because Mathlib supplies the same lemmas. The composed theorem has
 sixteen hypotheses in the signature and one application in the body.
 
-`test/check.py` runs in about 0.8 seconds of wall time on the pinned
-checker, for all thirty-eight cases.
+`AmmLean/Basic.lean` against the two files that port it.
+
+| Quantity | `AmmLean/Basic.lean` | `src/Pool.tot` and `src/Basic.tot` |
+| --- | --- | --- |
+| Lines | 286 | 86 and 634 |
+| Structures, or data records | 2 | 2 |
+| Definitions | 13 | 9 projections, 9 pure defs, 4 constructors |
+| Theorems | 8 | 8 theorems, 10 obligations, 3 unfolding lemmas |
+
+The Lean file counts thirteen definitions, because Lean states the four
+pool-constructing definitions and the nine pure definitions in one file.
+The tot side splits them: `src/Pool.tot` holds the nine projections that
+Lean gets from its structure syntax for free, and `src/Basic.tot` holds
+the nine pure defs, the eight theorems, the ten positivity obligations
+that Lean proves inline, the four constructors and the three unfolding
+lemmas. The two files hold 720 lines and 43 defs.
+
+The two new files, in proof-term occurrences. Comment lines are excluded
+from the counts.
+
+| file | lines | `trans0` | `cong0` | `sym0` | `subst0` |
+| --- | --- | --- | --- | --- | --- |
+| `src/Pool.tot` | 86 | 0 | 0 | 0 | 0 |
+| `src/Basic.tot` | 634 | 0 | 0 | 2 | 4 |
+
+`src/Pool.tot` holds no rewrite, because every projection is one match.
+The four `subst0` of `src/Basic.tot` are the transports of `swapHy`,
+`swapWithFeeHy`, `removeLiquidityHx` and `removeLiquidityHy`, and the
+two `sym0` are the symmetric forms of `mulAdd` in the first two of them.
+No def of either file holds a `trans0` or a `cong0`, because no
+obligation chains two equalities.
+
+`test/check.py` runs in about 2.7 seconds of wall time on the pinned
+checker, for all sixty-seven cases.
 
 ## Scope and trust
 
@@ -302,7 +455,8 @@ is excluded, including its unrelated IO-law axioms. Checking trusts
 tot's current elaborator and kernel. This project does not establish
 their metatheoretic soundness.
 
-The port covers one theorem, in two forms. The other thirty theorems of
+The port covers one theorem, in two forms, and the eight theorems of
+`AmmLean/Basic.lean`. The other twenty-two theorems of
 amm-lean are not ported. The order and fraction library holds thirty-six
 lemmas that those theorems cite. It declares no axiom of its own: every
 lemma is a def with a proof term, and the only new hypotheses are the
@@ -310,7 +464,7 @@ three fields that the record gained.
 
 ## Validation
 
-On 2026-09-06, all thirty-eight checks passed with checker SHA-256
+On 2026-09-06, all sixty-seven checks passed with checker SHA-256
 `30c4524d57f6723e39ba117097222f3ab8ef3e899a8a4af8b7e60c68337842bf` at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe`,
 built from tot commit `8cf0b8b` with a clean tree. Build that commit to
@@ -319,7 +473,7 @@ reproduce the reference checker.
 The checker reports every rejection in this repository with the word
 `mismatch`, except the axiom case, which reports `axiom`.
 
-The thirty-eight checks:
+The sixty-seven checks:
 
 - The theorem checks without a prelude or axioms.
 - The proof is rejected against a commuted right side, `fmul y x`.
@@ -356,8 +510,48 @@ The thirty-eight checks:
   `fdiv a (fmul c b)`, `invPos` states `flt (finv a) fzero`, and
   `divLtDivOfPosLeft` states `flt (fdiv a c) (fdiv a b)`. Each one is
   rejected at its own def.
+- Eight checks, one for each theorem of `src/Basic.tot`. Each check
+  changes the result type of the theorem and keeps the proof, so each
+  one is rejected at its own def:
+  `wrong-constantproduct-pos` at `constantProductPos`,
+  `wrong-feecomplement-pos` at `feeComplementPos`,
+  `wrong-feecomplement-ltone` at `feeComplementLtOne`,
+  `wrong-reservex-nezero` at `poolReserveXNeZero`,
+  `wrong-reservey-nezero` at `poolReserveYNeZero`,
+  `wrong-totallp-nezero` at `poolTotalLPNeZero`,
+  `wrong-reservex-add-pos` at `reserveXAddPos` and
+  `wrong-reservex-add-nezero` at `reserveXAddNeZero`.
+- Ten checks, one for each positivity obligation, by the same recipe:
+  `wrong-swap-hx` at `swapHx`, `wrong-swap-hy` at `swapHy`,
+  `wrong-swapwithfee-hx` at `swapWithFeeHx`,
+  `wrong-swapwithfee-hy` at `swapWithFeeHy`,
+  `wrong-addliquidity-hx` at `addLiquidityHx`,
+  `wrong-addliquidity-hy` at `addLiquidityHy`,
+  `wrong-addliquidity-hlp` at `addLiquidityHlp`,
+  `wrong-removeliquidity-hx` at `removeLiquidityHx`,
+  `wrong-removeliquidity-hy` at `removeLiquidityHy` and
+  `wrong-removeliquidity-hlp` at `removeLiquidityHlp`.
+- Nine checks, one for each pure definition. Each check changes the body
+  of the definition and keeps every statement, so the first def that
+  unfolds the definition is rejected: `wrong-constantproduct` at
+  `constantProductPos`, `wrong-swapoutput` at `swapHy`,
+  `wrong-effectiveprice` at `effectivePrice`, `wrong-spotprice` at
+  `spotPrice`, `wrong-feecomplement` at `feeComplementPos`,
+  `wrong-effectiveinput` at `swapWithFeeHy`, `wrong-swapoutputwithfee`
+  at `swapWithFeeHy`, `wrong-redeemx` at `removeLiquidityHx` and
+  `wrong-redeemy` at `removeLiquidityHy`. `effectivePrice` and
+  `spotPrice` are cited by no theorem of this milestone, so those two
+  checks change the result type of the definition instead of its body.
+- Two checks weaken a field of a record of `src/Pool.tot`. The
+  constructor field, the result type of the projection and the return
+  motive change together, so the projection still checks and the first
+  consumer of the projection is rejected: `weak-pool-hx` states
+  `hx : flt fzero totalLP` and is rejected at `constantProductPos`, and
+  `weak-feerate-hlt` states `hlt : flt fone rate` and is rejected at
+  `feeComplementPos`.
 
-For the seven checks that M3a adds, the runner also reads the position
+For the thirty-six checks that M3a and M3b add, the runner also reads
+the position
 of the diagnostic and confirms the name of the first failing def. A
 mutation that moves the rejection to another def fails the case. Each
 mutation helper asserts the exact number of occurrences of its anchor,
@@ -379,8 +573,9 @@ above.
 
 ## Probe results
 
-Ten facts about tot, found with scratch files. The first five come from
-the record milestone and the last five come from the M3a probes. The
+Fourteen facts about tot, found with scratch files. The first five come
+from the record milestone, the next five come from the M3a probes and
+the last four come from the M3b probes. The
 scratch files are not part of this repository.
 
 - A data record that bundles the eight field laws checks when the law
@@ -420,25 +615,42 @@ scratch files are not part of this repository.
   the field carries quantity w. A plain def is rejected, because the
   declared return type does not reduce against the field variables that
   the match binds.
+- Two data records with proof fields, and nine projections, check. The
+  three dependent `Pool` projections and the two dependent `FeeRate`
+  projections need the value projection to be a reducible def. The
+  checker prints the projection type with the match already inlined,
+  which is the evidence that the delta step happened.
+- A reducible pure def unfolds inside the statement of a theorem that is
+  proved through the axiom record. `constantProduct` unfolds inside the
+  statement of `constantProductPos`, and the axiom field `mulPos`
+  proves it with the two projections `poolHx` and `poolHy` in its two
+  erased slots.
+- A reducible constructor applied to the `pool` constructor unfolds by
+  delta, and the projection match then reduces by iota, so `refl`
+  proves the three unfolding lemmas of `swap`. The control changes the
+  endpoint of `swapTotalLP` to `fadd rx dx` and the checker rejects it
+  with a type mismatch.
+- The full `swapHy` chain checks, with `subPosOfLt`, `divLtOfLtMul`, a
+  `subst0` along `sym0` of `mulAdd`, and `ltAddOfPosLeft` over
+  `mulPos`. It is the archetype of `swapWithFeeHy`, `removeLiquidityHx`
+  and `removeLiquidityHy`.
 
 ## Next milestones
 
-1. M3b: `Pool` and `FeeRate` as data records with w proof fields and
-   reducible projections, the fifteen definitions of `AmmLean/Basic.lean`
-   as reducible defs, the eight theorems of that file, and the eleven
-   positivity obligations of `swap`, `swapWithFee`, `addLiquidity` and
-   `removeLiquidity`.
-2. M3c: the four theorems of `AmmLean/Invariant.lean` and the six
-   theorems of `AmmLean/NoDrain.lean`.
-3. M3d: the five theorems of `AmmLean/PriceImpact.lean` and the seven
-   theorems of `AmmLean/Liquidity.lean`. M3b, M3c and M3d together port
-   the other thirty theorems of amm-lean. Measure whether the
+1. M3c: the four theorems of `AmmLean/Invariant.lean` and the six
+   theorems of `AmmLean/NoDrain.lean`, stated on the four constructors
+   through the three unfolding lemmas.
+2. M3d: the five theorems of `AmmLean/PriceImpact.lean` and the seven
+   theorems of `AmmLean/Liquidity.lean`. M3c and M3d together port
+   the other twenty-two theorems of amm-lean. Measure whether the
    per-theorem overhead falls once the record, the derivation library
    and the order and fraction library exist.
-4. Supply a concrete carrier: an inhabitant of `OrderedField` for one
+3. Supply a concrete carrier: an inhabitant of `OrderedField` for one
    type, so that both theorems have a closed instance. tot has no
    rationals, so the carrier is a milestone of its own.
 
-Sources: `src/Foundation.tot`, `src/Field.tot`, `src/Invariant.tot`,
-`src/Axioms.tot`, `src/Ring.tot`, `src/Laws.tot`, `src/Compose.tot`,
-`src/Frac.tot`, `src/Order.tot`.
+Sources, thirteen files: `src/Foundation.tot`, `src/Field.tot`,
+`src/Invariant.tot`, `src/Axioms.tot`, `src/Ring.tot`, `src/Laws.tot`,
+`src/Compose.tot`, `src/Frac.tot`, `src/Order.tot`, `src/Pool.tot`,
+`src/Basic.tot`, `test/check.py`, `README.md`. The first eleven are the
+check order.

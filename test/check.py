@@ -1,4 +1,5 @@
 """Check the swap identity, the order and fraction library, and the rejection controls."""
+from functools import reduce
 from pathlib import Path
 import hashlib
 import os
@@ -11,7 +12,7 @@ DEFAULT_TOT = Path("/Users/oobi/Documents/kan-lang-tot-pin/"
                    "_build/default/bin/tot.exe")
 TOT = Path(os.environ.get("TOT", DEFAULT_TOT))
 NAMES = ["Foundation", "Field", "Invariant", "Axioms", "Ring", "Laws",
-         "Compose", "Frac", "Order"]
+         "Compose", "Frac", "Order", "Pool", "Basic"]
 FILES = {name: (ROOT / "src" / f"{name}.tot").read_text() for name in NAMES}
 FIELD = FILES["Field"]
 INVARIANT = FILES["Invariant"]
@@ -19,9 +20,10 @@ AXIOMS = FILES["Axioms"]
 LAWS_SRC = FILES["Laws"]
 FRAC = FILES["Frac"]
 ORDER = FILES["Order"]
+POOL = FILES["Pool"]
 
 def concatenate(**changed):
-    """Return the nine sources in check order, with the named ones replaced."""
+    """Return the eleven sources in check order, with the named ones replaced."""
     return "\n".join(changed.get(name, FILES[name]) for name in NAMES)
 
 BASE = concatenate()
@@ -152,10 +154,28 @@ def mutate_axioms(old, new):
         raise SystemExit(f"anchor is not unique in Axioms.tot: {old!r}")
     return concatenate(Axioms=AXIOMS.replace(old, new))
 
+def mutate_pool(pairs):
+    """Return BASE with paired substrings of src/Pool.tot replaced.
+
+    Each pair is (old, new). The count is exact and it is one, so the
+    record field, the result type of the projection and the return motive
+    change together. The projection still checks and the first consumer
+    of the projection is the def that fails.
+    """
+    def one(text, pair):
+        old, new = pair
+        found = text.count(old)
+        if found != 1:
+            raise SystemExit(f"anchor occurs {found} times, not 1, "
+                             f"in Pool.tot: {old!r}")
+        return text.replace(old, new)
+    changed = reduce(one, pairs, POOL)
+    return concatenate(Pool=changed)
+
 def def_span(name, source=None, where="Laws.tot"):
     """Return the span of one def, from its header to its check line."""
     text = LAWS_SRC if source is None else source
-    header = re.search(rf"^def {name}\b", text, re.MULTILINE)
+    header = re.search(rf"^(?:reducible )?def {name}\b", text, re.MULTILINE)
     if header is None:
         raise SystemExit(f"def not found in {where}: {name}")
     return header.start(), text.index(f"\ncheck {name}\n", header.start())
@@ -196,6 +216,144 @@ def swap_in_laws(name, first, second):
     swapped = (block.replace(first, "\0").replace(second, first)
                .replace("\0", second))
     return concatenate(Laws=LAWS_SRC[:start] + swapped + LAWS_SRC[end:])
+
+# The abbreviations of the M3b brief, spelled out as the files spell
+# them. OPS is the ten operation arguments of a pure def, and PARAMS is
+# OPS followed by the axiom record.
+OPS = "F fadd fmul fsub fdiv fneg finv fzero fone flt"
+RX = "(poolReserveX F fzero flt p)"
+RY = "(poolReserveY F fzero flt p)"
+LPT = "(poolTotalLP F fzero flt p)"
+
+# The 27 negatives of src/Basic.tot: (case, def, old, new, failing def).
+# The first eight change the result type of a theorem and keep the
+# proof. The next ten do the same for an obligation. The last nine
+# change the body of a pure definition and keep every statement, so the
+# first def that unfolds the definition fails.
+BASIC_NEGATIVES = [
+    ("wrong-constantproduct-pos", "constantProductPos",
+     f"flt fzero (constantProduct {OPS} p) :=",
+     f"flt (constantProduct {OPS} p) fzero :=",
+     "constantProductPos"),
+    ("wrong-feecomplement-pos", "feeComplementPos",
+     f"flt fzero (feeComplement {OPS} f) :=",
+     f"flt (feeComplement {OPS} f) fzero :=",
+     "feeComplementPos"),
+    ("wrong-feecomplement-ltone", "feeComplementLtOne",
+     f"flt (feeComplement {OPS} f) fone :=",
+     f"flt fone (feeComplement {OPS} f) :=",
+     "feeComplementLtOne"),
+    ("wrong-reservex-nezero", "poolReserveXNeZero",
+     f"(0 e : Eq F {RX} fzero) -> Empty :=",
+     f"(0 e : Eq F fzero {RX}) -> Empty :=",
+     "poolReserveXNeZero"),
+    ("wrong-reservey-nezero", "poolReserveYNeZero",
+     f"(0 e : Eq F {RY} fzero) -> Empty :=",
+     f"(0 e : Eq F fzero {RY}) -> Empty :=",
+     "poolReserveYNeZero"),
+    ("wrong-totallp-nezero", "poolTotalLPNeZero",
+     f"(0 e : Eq F {LPT} fzero) -> Empty :=",
+     f"(0 e : Eq F fzero {LPT}) -> Empty :=",
+     "poolTotalLPNeZero"),
+    ("wrong-reservex-add-pos", "reserveXAddPos",
+     f"flt fzero (fadd {RX} dx) :=",
+     f"flt fzero (fadd dx {RX}) :=",
+     "reserveXAddPos"),
+    ("wrong-reservex-add-nezero", "reserveXAddNeZero",
+     f"(0 e : Eq F (fadd {RX} dx) fzero) -> Empty :=",
+     f"(0 e : Eq F (fadd dx {RX}) fzero) -> Empty :=",
+     "reserveXAddNeZero"),
+    ("wrong-swap-hx", "swapHx",
+     f"flt fzero (fadd {RX} dx) :=",
+     f"flt fzero (fadd dx {RX}) :=",
+     "swapHx"),
+    ("wrong-swap-hy", "swapHy",
+     f"(fsub {RY}\n      (swapOutput {OPS} p dx)) :=",
+     f"(fsub (swapOutput {OPS} p dx)\n      {RY}) :=",
+     "swapHy"),
+    ("wrong-swapwithfee-hx", "swapWithFeeHx",
+     f"flt fzero (fadd {RX} dx) :=",
+     f"flt fzero (fadd dx {RX}) :=",
+     "swapWithFeeHx"),
+    ("wrong-swapwithfee-hy", "swapWithFeeHy",
+     f"(fsub {RY}\n    (swapOutputWithFee {OPS} p dx f)) :=",
+     f"(fsub (swapOutputWithFee {OPS} p dx f)\n    {RY}) :=",
+     "swapWithFeeHy"),
+    ("wrong-addliquidity-hx", "addLiquidityHx",
+     f"flt fzero (fadd {RX} dx) :=",
+     f"flt fzero (fadd dx {RX}) :=",
+     "addLiquidityHx"),
+    ("wrong-addliquidity-hy", "addLiquidityHy",
+     f"(fadd {RY}\n      (fdiv (fmul dx {RY}) {RX})) :=",
+     f"(fadd (fdiv (fmul dx {RY}) {RX})\n      {RY}) :=",
+     "addLiquidityHy"),
+    ("wrong-addliquidity-hlp", "addLiquidityHlp",
+     f"(fadd {LPT}\n      (fdiv (fmul dx {LPT}) {RX})) :=",
+     f"(fadd (fdiv (fmul dx {LPT}) {RX})\n      {LPT}) :=",
+     "addLiquidityHlp"),
+    ("wrong-removeliquidity-hx", "removeLiquidityHx",
+     f"(fsub {RX}\n    (redeemX {OPS} p lp)) :=",
+     f"(fsub (redeemX {OPS} p lp)\n    {RX}) :=",
+     "removeLiquidityHx"),
+    ("wrong-removeliquidity-hy", "removeLiquidityHy",
+     f"(fsub {RY}\n    (redeemY {OPS} p lp)) :=",
+     f"(fsub (redeemY {OPS} p lp)\n    {RY}) :=",
+     "removeLiquidityHy"),
+    ("wrong-removeliquidity-hlp", "removeLiquidityHlp",
+     f"flt fzero (fsub {LPT} lp) :=",
+     f"flt fzero (fsub lp {LPT}) :=",
+     "removeLiquidityHlp"),
+    ("wrong-constantproduct", "constantProduct",
+     f"fmul {RX} {RY}", f"fmul {RX} {RX}",
+     "constantProductPos"),
+    ("wrong-swapoutput", "swapOutput",
+     f"(fadd {RX} dx)", f"(fadd {RX} {RX})",
+     "swapHy"),
+    ("wrong-effectiveprice", "effectivePrice",
+     "(p : Pool F fzero flt) -> (dx : F) -> F :=",
+     "(p : Pool F fzero flt) -> (dx : F) -> Pool F fzero flt :=",
+     "effectivePrice"),
+    ("wrong-spotprice", "spotPrice",
+     "(p : Pool F fzero flt) -> F :=",
+     "(p : Pool F fzero flt) -> Pool F fzero flt :=",
+     "spotPrice"),
+    ("wrong-feecomplement", "feeComplement",
+     "fsub fone (feeRateRate F fzero fone flt f)",
+     "fsub (feeRateRate F fzero fone flt f) fone",
+     "feeComplementPos"),
+    ("wrong-effectiveinput", "effectiveInput",
+     f"fmul dx (feeComplement {OPS} f)", "fmul dx dx",
+     "swapWithFeeHy"),
+    ("wrong-swapoutputwithfee", "swapOutputWithFee",
+     f"(fadd {RX} (effectiveInput {OPS} dx f))",
+     f"(fadd {RX} dx)",
+     "swapWithFeeHy"),
+    ("wrong-redeemx", "redeemX",
+     f"fdiv (fmul lp {RX}) {LPT}", f"fdiv (fmul lp {LPT}) {RX}",
+     "removeLiquidityHx"),
+    ("wrong-redeemy", "redeemY",
+     f"fdiv (fmul lp {RY}) {LPT}", f"fdiv (fmul lp {LPT}) {RY}",
+     "removeLiquidityHy"),
+]
+
+# The two record negatives. The constructor field, the result type of
+# the projection and the return motive change together.
+POOL_HX = [
+    ("(hx : flt fzero reserveX)", "(hx : flt fzero totalLP)"),
+    (f"(p : Pool F fzero flt) -> flt fzero {RX} :=",
+     f"(p : Pool F fzero flt) -> flt fzero {LPT} :="),
+    ("match p as q return flt fzero (poolReserveX F fzero flt q) with",
+     "match p as q return flt fzero (poolTotalLP F fzero flt q) with"),
+]
+FEERATE_HLT = [
+    ("(hlt : flt rate fone)", "(hlt : flt fone rate)"),
+    ("(f : FeeRate F fzero fone flt) ->"
+     " flt (feeRateRate F fzero fone flt f) fone :=",
+     "(f : FeeRate F fzero fone flt) ->"
+     " flt fone (feeRateRate F fzero fone flt f) :="),
+    ("match f as g return flt (feeRateRate F fzero fone flt g) fone with",
+     "match f as g return flt fone (feeRateRate F fzero fone flt g) with"),
+]
 
 # A case is (name, full source, expected diagnostic word).
 # None: the checker must accept. A string: the checker must exit with
@@ -248,6 +406,12 @@ CASES = [
      mutate_in_def("Order", "divLtDivOfPosLeft",
                    "flt (fdiv a b) (fdiv a c) :=",
                    "flt (fdiv a c) (fdiv a b) :="), "mismatch"),
+    # The 27 negatives of src/Basic.tot and the two record negatives of
+    # src/Pool.tot that M3b adds.
+] + [(name, mutate_in_def("Basic", def_name, old, new), "mismatch")
+     for name, def_name, old, new, _failing in BASIC_NEGATIVES] + [
+    ("weak-pool-hx", mutate_pool(POOL_HX), "mismatch"),
+    ("weak-feerate-hlt", mutate_pool(FEERATE_HLT), "mismatch"),
 ]
 
 # The def that must fail first, for every case that M3a adds. The name
@@ -261,6 +425,10 @@ FAILING_DEFS = {
     "wrong-divdiv": "divDiv",
     "wrong-invpos": "invPos",
     "wrong-divltdiv": "divLtDivOfPosLeft",
+    **{name: failing
+       for name, _def_name, _old, _new, failing in BASIC_NEGATIVES},
+    "weak-pool-hx": "constantProductPos",
+    "weak-feerate-hlt": "feeComplementPos",
 }
 
 def failing_def(source, result):
