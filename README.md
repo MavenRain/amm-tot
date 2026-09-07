@@ -24,11 +24,11 @@ Run from this directory. The runner uses the checker named by `TOT` when
 that variable is set. Otherwise it uses the pinned checker at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe` and
 stops with a message when that file is absent. The runner concatenates
-the eighteen source files of `src`, in the order in which the Sources line
-at the end of this file names them, in temporary files and checks with
-`--no-prelude --no-axioms`. It prints the checker SHA-256, so validation
-identifies the binary actually used. No compiler rebuild is necessary
-when a built checker exists.
+the twenty-two source files of `src`, in the order in which the Sources
+line at the end of this file names them, in temporary files and checks
+with `--no-prelude --no-axioms`. It prints the checker SHA-256, so
+validation identifies the binary actually used. No compiler rebuild is
+necessary when a built checker exists.
 
 ## What is proved
 
@@ -634,9 +634,8 @@ without unfolding opaque theorem bodies.
 
 The universal property gives uniqueness, symmetry and the zero, equal
 input and unit laws. In particular, `gcd zero zero` is zero, and a nonzero
-input gives a nonzero gcd. These facts prepare normalization by a common
-factor. Exact division, coprimality of the reduced components and equality
-of canonical fractions belong to M4d.
+input gives a nonzero gcd. These facts support normalization by a common
+factor in M4d1 below.
 
 This slice adds no axioms and changes none of the seventeen existing
 source files. The natural-number computations and their proofs are closed
@@ -645,6 +644,57 @@ The file holds three data types, `NatDvd`, `GcdCompare` and `GcdSpec`,
 four computing definitions and 47 proofs. `natDvdWitnessUnique` proves
 that a nonzero divisor has a unique quotient, using `natMulCancelLeft`
 and the integer multiplication cancellation theorem through `pos`.
+
+## Canonical rationals and normalization
+
+M4d1 adds `src/Div.tot`, `src/Reduce.tot`, `src/Rat.tot` and
+`src/RatNormalize.tot`. This slice constructs reduced fractions and
+proves normalization correct. Rational arithmetic operations and their
+field laws remain M4d2; rational order and the closed `OrderedField`
+instance remain M4e.
+
+`natDiv n d` computes natural division by repeated subtraction with
+structural fuel. It is total, with `natDiv n zero = zero`. The proved
+exactness contract requires a nonzero divisor and `NatDvd d n`: then
+`mul d (natDiv n d) = n`. The library also proves quotient uniqueness,
+nonzero exact quotients, division by one, self division and division of
+a multiple. It does not yet prove a remainder specification for
+nondivisible inputs.
+The raw worker `natDivFuel` returns a short quotient below that bound,
+and zero at fuel zero. `natDivFuelExact` states the value only under
+the strict bound `NatLt n fuel`, which `natDiv` supplies as `succ n`.
+
+`gcdReducedQuotients` in `src/Reduce.tot` proves that dividing both
+components by their nonzero gcd gives coprime components. It accepts
+the two reconstruction equations explicitly, so it can certify the
+computing quotients without extracting a value from an opaque proof.
+
+`Rat` stores an integer numerator, a natural denominator predecessor
+and an erased certificate that their gcd is one. The denominator is
+`succ denPred`, which makes it positive by construction. `ratNum`,
+`ratDenPred` and `ratDen` compute the projections; `ratReduced` recovers
+the certificate. `ratExt` proves equality from equal numerators and
+denominators even when the certificate terms differ. Erasure alone
+does not give that equality: `natEqProofUnique` proves uniqueness of
+natural equality proofs from decidable equality and path induction.
+No proof-irrelevance axiom is added. The file also constructs `ratZero`,
+`ratOne` and `ratOfInt`, proves the integer embedding injective, and
+proves zero distinct from one.
+
+`ratNormalize n d` represents `n / (d + 1)`. It divides the numerator's
+absolute value and the positive denominator by their gcd, restores the
+numerator's sign, and packages the coprimality certificate. Its value
+projections compute independently of the certificate proof.
+`ratNormalizeNumExact` and `ratNormalizeDenExact` reconstruct the
+original components by multiplying by the gcd. `ratNormalizeValue`
+proves the corresponding integer cross-product equation.
+`ratNormalizeFixed` proves that normalizing the components of any
+existing `Rat` returns that same value. This gives
+`ratNormalizeIdempotent` and agreement with the integer embedding in
+`ratNormalizeOfInt`.
+This slice adds no axioms and changes none of the eighteen existing
+source files. The four files hold one data type, `Rat`, seventeen
+computing definitions and 47 proofs.
 
 ## Measurement
 
@@ -841,7 +891,22 @@ Comment lines are excluded from the counts, as in the tables above.
 | src/Int.tot | Lean core | 1081 | 81 | 61 | 55 | 16 |
 | `src/Gcd.tot` | Lean core counterparts | 468 | 34 | 17 | 22 | 10 |
 
-The file is 318 lines with its nineteen-line header comment, and 299
+M4d1 uses the same counting recipe: exclude comment lines, retain blank
+lines and count each named combinator occurrence in the remaining text.
+The roles below describe the local implementation.
+
+| file | role | lines | `trans0` | `cong0` | `sym0` | `subst0` |
+| --- | --- | --- | --- | --- | --- | --- |
+| `src/Div.tot` | computing division and exact quotient proofs | 159 | 9 | 3 | 8 | 2 |
+| `src/Reduce.tot` | gcd quotient coprimality | 53 | 2 | 1 | 2 | 0 |
+| `src/Rat.tot` | canonical representation and extensionality | 159 | 6 | 4 | 6 | 0 |
+| `src/RatNormalize.tot` | normalization and its correctness | 192 | 11 | 12 | 4 | 0 |
+| total | | 563 | 28 | 20 | 20 | 2 |
+
+These four files contain 64 definitions and 64 trailing `check`
+commands. `src/Rat.tot` also uses `J0` once for path induction.
+
+`src/Nat.tot` is 318 lines with its nineteen-line header comment, and 299
 lines without it. The Lean column names the library that supplies the
 same declarations: `Nat` and its lemmas come from Lean core and
 Mathlib, so the Lean side of M4a costs no source file of its own. The
@@ -1059,19 +1124,23 @@ These names were checked in Lean v4.30.0-rc1's
 They identify mathematical counterparts. Lean's `Nat.gcd` uses modulus
 Euclid, while this file uses subtraction and an explicit fuel proof.
 
-`test/check.py` checks all 181 cases against the pinned checker.
+`test/check.py` passes all 244 cases against the pinned checker.
 
 ## Scope and trust
 
 The eight laws are theorems of `src/Laws.tot`, proved from the seventeen
 axioms of `OrderedField`. Those axioms are hypotheses, not tot axioms.
 The records `FieldLaws` and `OrderedField` are hypotheses of the same
-kind: this repository supplies no inhabitant of either one. No file
-declares an axiom, and `--no-axioms` rejects any axiom. Nothing in this
-repository asserts that an ordered field exists. The signatures of
-`swapOutputIdentity` and `swapOutputIdentityOf` therefore have no tot
-inhabitant that this repository supplies: a caller must supply the
-operations and one record. Both theorems are conditional on them.
+kind: this repository supplies no closed inhabitant of either one. No
+file declares an axiom, and `--no-axioms` rejects any axiom. A caller of
+`swapOutputIdentity` or `swapOutputIdentityOf` must supply the operations
+and one record. Both theorems are conditional on them.
+
+M4d1 supplies a concrete `Rat` type, its integer embedding and a proved
+normalizer, using closed natural and integer arithmetic proofs. It
+does not yet supply rational field operations, their laws, rational
+order or an inhabitant of `OrderedField Rat`. Those are the remaining
+carrier milestones.
 
 The standalone foundation declares only `Empty` and indexed
 propositional `Eq`, with `subst0`, `J0`, `sym0`, `trans0` and `cong0`.
@@ -1092,7 +1161,7 @@ three fields that the record gained.
 
 ## Validation
 
-On 2026-09-06, all 181 checks passed with checker SHA-256
+On 2026-09-06, all 244 checks passed with checker SHA-256
 `30c4524d57f6723e39ba117097222f3ab8ef3e899a8a4af8b7e60c68337842bf` at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe`,
 built from tot commit `8cf0b8b` with a clean tree. Build that commit to
@@ -1101,7 +1170,15 @@ reproduce the reference checker.
 The checker reports every rejection in this repository with the word
 `mismatch`, except the axiom case, which reports `axiom`.
 
-The 181 checks:
+M4d1 extends that baseline to 244 cases. It adds 49 header mutations:
+14 for division, five for gcd reduction, 14 for rational representation
+and 16 for normalization. Fourteen further cases cover computations,
+proof interfaces and rejection controls. The computation grids compare
+91 natural division inputs with Python integer division (using zero
+for division by zero), and the numerator and denominator of 114
+normalized fractions with Python's `fractions.Fraction`.
+
+The 181 M4c baseline checks:
 
 - The theorem checks without a prelude or axioms.
 - The proof is rejected against a commuted right side, `fmul y x`.
@@ -1300,12 +1377,12 @@ The 181 checks:
   their own, because a mutation of any of them is caught by the theorem
   that cites it.
 
-For the 147 checks that M3a, M3b, M3c, M3d, M4a, M4b and M4c add, the
-runner also reads the position of the diagnostic and confirms the name
-of the first failing def. A mutation that moves the rejection to
-another def fails the case. Each mutation helper asserts the exact
-number of occurrences of its anchor, so a rename in a source file
-stops the runner instead of weakening a case.
+For 206 rejection controls, including all 59 that M4d1 adds, the runner
+also reads the position of the diagnostic and confirms the name of the
+first failing def. A mutation that moves the rejection to another def
+fails the case. Each mutation helper asserts the exact number of
+occurrences of its anchor, so a rename in a source file stops the
+runner instead of weakening a case.
 
 The negative controls show that specific proof terms are rejected. They
 do not show that the false statements are unprovable.
@@ -1456,20 +1533,25 @@ stand in the unfolded form, and no `subst0` replaces a `cong0` step.
 Milestone M4 supplies a concrete carrier: an inhabitant of
 `OrderedField` for one type, so that every theorem has a closed
 instance. Every ordered field is infinite, so the carrier is the
-rationals, and M4 is cut into five slices.
+rationals. M4 has five slices, with M4d split into normalization and
+arithmetic.
 
 1. M4a, the natural numbers, `src/Nat.tot`. Done.
 2. M4b, the integers, `src/Int.tot`. Done.
 3. M4c, divisibility and the greatest common divisor, `src/Gcd.tot`.
-   Done, this commit.
-4. M4d, the reduced fractions and the field laws, `src/Rat.tot`.
+   Done.
+4. M4d1, canonical fractions and normalization, `src/Div.tot`,
+   `src/Reduce.tot`, `src/Rat.tot` and `src/RatNormalize.tot`. Done.
+   M4d2 supplies rational arithmetic operations, their field laws and
+   equality of canonical fractions.
 5. M4e, the order, the `OrderedField` inhabitant and the closed
    instance, `src/RatOrder.tot` and `src/Instance.tot`.
 
-Sources, twenty files: `src/Foundation.tot`, `src/Field.tot`,
+Sources, twenty-four files: `src/Foundation.tot`, `src/Field.tot`,
 `src/Invariant.tot`, `src/Axioms.tot`, `src/Ring.tot`, `src/Laws.tot`,
 `src/Compose.tot`, `src/Frac.tot`, `src/Order.tot`, `src/Pool.tot`,
 `src/Basic.tot`, `src/Product.tot`, `src/NoDrain.tot`,
 `src/PriceImpact.tot`, `src/Liquidity.tot`, `src/Nat.tot`,
-`src/Int.tot`, `src/Gcd.tot`, `test/check.py`, `README.md`. The first
-eighteen are the check order.
+`src/Int.tot`, `src/Gcd.tot`, `src/Div.tot`, `src/Reduce.tot`,
+`src/Rat.tot`, `src/RatNormalize.tot`, `test/check.py`, `README.md`.
+The first twenty-two are the check order.

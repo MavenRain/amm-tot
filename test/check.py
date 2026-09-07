@@ -1,5 +1,6 @@
 """Check the swap identity, the order and fraction library, and the rejection controls."""
 from functools import reduce
+from fractions import Fraction
 from math import gcd as expected_gcd
 from pathlib import Path
 import hashlib
@@ -14,7 +15,8 @@ DEFAULT_TOT = Path("/Users/oobi/Documents/kan-lang-tot-pin/"
 TOT = Path(os.environ.get("TOT", DEFAULT_TOT))
 NAMES = ["Foundation", "Field", "Invariant", "Axioms", "Ring", "Laws",
          "Compose", "Frac", "Order", "Pool", "Basic", "Product", "NoDrain",
-         "PriceImpact", "Liquidity", "Nat", "Int", "Gcd"]
+         "PriceImpact", "Liquidity", "Nat", "Int", "Gcd", "Div", "Reduce",
+         "Rat", "RatNormalize"]
 FILES = {name: (ROOT / "src" / f"{name}.tot").read_text() for name in NAMES}
 FIELD = FILES["Field"]
 INVARIANT = FILES["Invariant"]
@@ -186,11 +188,15 @@ def def_span(name, source=None, where="Laws.tot"):
 def mutate_in_def(file_name, def_name, old, new, count=1):
     """Return BASE with one substring inside one def of one file replaced.
 
-    The count is exact. It guards the anchor of every new negative case:
-    the anchor ends with the ":=" of the def header, so it matches the
-    result type of the def and never a step of its body.
+    The count is exact and the mutation must change the text, so a
+    rename or a dead anchor stops the runner instead of weakening a
+    case. Header anchors end with the ":=" of the def header; body
+    anchors name one match arm.
     """
     source = FILES[file_name]
+    if old == new:
+        raise SystemExit(f"mutation is the identity in {file_name}.tot "
+                         f"def {def_name}: {old!r}")
     start, end = def_span(def_name, source, f"{file_name}.tot")
     block = source[start:end]
     found = block.count(old)
@@ -813,16 +819,144 @@ GCD_NEGATIVES = [
     ("wrong-gcd-step-spec", "gcdStepSpec", "GcdSpec (gcdCompareStep (succ p) (succ q) c next) (succ p) (succ q) :=", "GcdSpec (gcdCompareStep (succ p) (succ q) c next) (succ q) (succ p) :="),
 ]
 
-def mutate_gcd_header(def_name, old, new):
+def mutate_header(file_name, def_name, old, new):
     """Restrict a mutation to one header, including when checks end the file."""
-    source = FILES["Gcd"]
-    start, _end = def_span(def_name, source, "Gcd.tot")
+    source = FILES[file_name]
+    start, _end = def_span(def_name, source, f"{file_name}.tot")
     header = source[start:source.index(":=", start) + 2]
     if old == new:
-        raise SystemExit(f"header mutation is the identity in Gcd.tot def {def_name}: {old!r}")
+        raise SystemExit(f"header mutation is the identity in {file_name}.tot "
+                         f"def {def_name}: {old!r}")
     if header.count(old) != 1:
-        raise SystemExit(f"header anchor must occur once in Gcd.tot def {def_name}: {old!r}")
-    return mutate_in_def("Gcd", def_name, header, header.replace(old, new))
+        raise SystemExit(f"header anchor must occur once in {file_name}.tot "
+                         f"def {def_name}: {old!r}")
+    return mutate_in_def(file_name, def_name, header, header.replace(old, new))
+
+def mutate_gcd_header(def_name, old, new):
+    return mutate_header("Gcd", def_name, old, new)
+
+# Each result-type control retains the proof and must fail at the named
+# definition. Premise controls also protect sufficient fuel and exactness.
+DIV_NEGATIVES = [
+    ("wrong-div-small-zero", "natDvdSmallZero", "Eq Nat n zero :=", "Eq Nat n one :="),
+    ("wrong-div-step-exact", "natDivStepExact",
+     "Eq Nat (mul (succ p) (natDivStep n p c next)) n :=",
+     "Eq Nat (mul (succ p) (natDivStep n p c next)) zero :="),
+    ("wrong-div-fuel-exact", "natDivFuelExact",
+     "Eq Nat (mul (succ p) (natDivFuel fuel n p)) n :=",
+     "Eq Nat (mul (succ p) (natDivFuel fuel n p)) zero :="),
+    ("wrong-div-fuel-bound", "natDivFuelExact", "NatLt n fuel ->", "NatLt zero fuel ->"),
+    ("wrong-div-self-bound", "natLtSuccSelf", "NatLt n (succ n) :=", "NatLt n n :="),
+    ("wrong-div-exact", "natDivExact", "Eq Nat (mul d (natDiv n d)) n :=",
+     "Eq Nat (mul d (natDiv n d)) d :="),
+    ("wrong-div-divisibility-premise", "natDivExact", "NatDvd d n ->", "NatDvd n d ->"),
+    ("wrong-div-unique", "natDivUnique", "Eq Nat (natDiv n d) q :=",
+     "Eq Nat (natDiv n d) n :="),
+    ("wrong-div-nonzero", "natDivNeZero", "Eq Nat (natDiv n d) zero -> Empty :=",
+     "Eq Nat (natDiv n d) one -> Empty :="),
+    ("wrong-div-zero-left", "natDivZeroLeft", "Eq Nat (natDiv zero d) zero :=",
+     "Eq Nat (natDiv zero d) one :="),
+    ("wrong-div-zero-right", "natDivZeroRight", "Eq Nat (natDiv n zero) zero :=",
+     "Eq Nat (natDiv n zero) one :="),
+    ("wrong-div-one", "natDivOne", "Eq Nat (natDiv n one) n :=",
+     "Eq Nat (natDiv n one) one :="),
+    ("wrong-div-self", "natDivSelf", "Eq Nat (natDiv n n) one :=",
+     "Eq Nat (natDiv n n) n :="),
+    ("wrong-div-mul", "natDivMul", "Eq Nat (natDiv (mul d q) d) q :=",
+     "Eq Nat (natDiv (mul d q) d) d :="),
+]
+
+REDUCE_NEGATIVES = [
+    ("wrong-reduce-scale", "natDvdScaleLeft", "NatDvd (mul c d) (mul c n) :=",
+     "NatDvd (mul c n) (mul c d) :="),
+    ("wrong-reduce-cancel-scale", "natDvdCancelScaleLeft", "NatDvd d n :=", "NatDvd n d :="),
+    ("wrong-reduce-self", "natDvdOfScaleDvdSelf", "NatDvd d one :=", "NatDvd one d :="),
+    ("wrong-reduce-common-divisor", "gcdReducedCommonDivisor", "NatDvd d one :=", "NatDvd d x :="),
+    ("wrong-reduce-quotients", "gcdReducedQuotients", "Eq Nat (gcd x y) one :=",
+     "Eq Nat (gcd x y) zero :="),
+]
+
+RAT_NEGATIVES = [
+    ("wrong-rat-eq-select", "natEqSelectConstant",
+     "Eq (Eq Nat a b) (natEqSelect a b p) (natEqSelect a b q) :=",
+     "Eq (Eq Nat a b) (natEqSelect a b p) q :="),
+    ("wrong-rat-eq-sym-trans", "natEqSymTrans", "(refl Nat b) :=",
+     "(natEqSelect b b (refl Nat b)) :="),
+    ("wrong-rat-eq-normalize", "natEqNormalizeCorrect",
+     "Eq (Eq Nat a b) (natEqNormalize a b p) p :=",
+     "Eq (Eq Nat a b) (natEqNormalize a b p) (natEqSelect a b p) :="),
+    ("wrong-rat-eq-unique", "natEqProofUnique", "Eq (Eq Nat a b) p q :=",
+     "Eq (Eq Nat a b) p (natEqSelect a b q) :="),
+    ("wrong-rat-reduced", "ratReduced",
+     "Eq Nat (gcd (natAbs (ratNum r)) (ratDen r)) one :=",
+     "Eq Nat (gcd (natAbs (ratNum r)) (ratDen r)) zero :="),
+    ("wrong-rat-same", "ratSame", "Eq Rat (rat n d p) (rat n d q) :=",
+     "Eq Nat (ratDen (rat n d p)) d :="),
+    ("wrong-rat-ctor-ext", "ratCtorExt", "Eq Rat (rat n d p) (rat m e q) :=",
+     "Eq Nat (ratDen (rat m e q)) e :="),
+    ("wrong-rat-ext", "ratExt", "Eq Rat r s :=",
+     "Eq Nat (ratDen r) (ratDenPred r) :="),
+    ("wrong-rat-num-of-int", "ratNumOfInt", "Eq Int (ratNum (ratOfInt n)) n :=",
+     "Eq Int (ratNum (ratOfInt n)) intZero :="),
+    ("wrong-rat-den-of-int", "ratDenOfInt", "Eq Nat (ratDen (ratOfInt n)) one :=",
+     "Eq Nat (ratDen (ratOfInt n)) zero :="),
+    ("wrong-rat-den-pos", "ratDenPos", "NatLt zero (ratDen r) :=",
+     "NatLt (ratDen r) zero :="),
+    ("wrong-rat-den-nonzero", "ratDenNeZero", "Eq Nat (ratDen r) zero",
+     "Eq Nat (ratDen r) one"),
+    ("wrong-rat-int-injective", "ratOfIntInjective", "Eq Int n m :=",
+     "Eq Int n intZero :="),
+    ("wrong-rat-zero-ne-one", "ratZeroNeOne", "Eq Rat ratZero ratOne",
+     "Eq Rat ratZero ratZero"),
+]
+
+NORMALIZE_NEGATIVES = [
+    ("wrong-signed-div-abs", "signedDivAbs",
+     "Eq Nat (natAbs (signedDiv n g)) (natDiv (natAbs n) g) :=",
+     "Eq Nat (natAbs (signedDiv n g)) (natAbs n) :="),
+    ("wrong-signed-div-exact", "signedDivExact",
+     "Eq Int (intMul (pos g) (signedDiv n g)) n :=",
+     "Eq Int (intMul (pos g) (signedDiv n g)) (intNeg n) :="),
+    ("wrong-normalize-gcd-nonzero", "ratCommonDivisorNeZero",
+     "Eq Nat (ratCommonDivisor n d) zero -> Empty :=",
+     "Eq Nat (ratCommonDivisor n d) one -> Empty :="),
+    ("wrong-normalize-den-nonzero", "ratReducedDenNeZero",
+     "Eq Nat (ratReducedDen n d) zero -> Empty :=",
+     "Eq Nat (ratReducedDen n d) one -> Empty :="),
+    ("wrong-normalize-den-pred", "natSuccPredOfNeZero", "Eq Nat (succ (pred n)) n :=",
+     "Eq Nat (succ (pred n)) zero :="),
+    ("wrong-normalize-reduced", "ratNormalizeReduced",
+     "(succ (pred (ratReducedDen n d)))) one :=",
+     "(succ (pred (ratReducedDen n d)))) zero :="),
+    ("wrong-normalize-num", "ratNormalizeNum",
+     "Eq Int (ratNum (ratNormalize n d)) (signedDiv n (ratCommonDivisor n d)) :=",
+     "Eq Int (ratNum (ratNormalize n d)) n :="),
+    ("wrong-normalize-den", "ratNormalizeDen",
+     "Eq Nat (ratDen (ratNormalize n d)) (ratReducedDen n d) :=",
+     "Eq Nat (ratDen (ratNormalize n d)) (succ d) :="),
+    ("wrong-normalize-num-exact", "ratNormalizeNumExact",
+     "Eq Int (intMul (pos (ratCommonDivisor n d)) (ratNum (ratNormalize n d))) n :=",
+     "Eq Int (intMul (pos (ratCommonDivisor n d)) (ratNum (ratNormalize n d))) intZero :="),
+    ("wrong-normalize-den-exact", "ratNormalizeDenExact",
+     "Eq Nat (mul (ratCommonDivisor n d) (ratDen (ratNormalize n d))) (succ d) :=",
+     "Eq Nat (mul (ratCommonDivisor n d) (ratDen (ratNormalize n d))) d :="),
+    ("wrong-normalize-scaled-cross", "ratScaledCross",
+     "Eq Int (intMul (pos d) x) (intMul n (pos y)) :=",
+     "Eq Int (intMul (pos d) x) (intMul x (pos y)) :="),
+    ("wrong-normalize-value", "ratNormalizeValue",
+     "(intMul n (pos (ratDen (ratNormalize n d)))) :=",
+     "(intMul n (pos (succ d))) :="),
+    ("wrong-signed-div-one", "signedDivOne", "Eq Int (signedDiv n one) n :=",
+     "Eq Int (signedDiv n one) intZero :="),
+    ("wrong-normalize-fixed", "ratNormalizeFixed",
+     "Eq Rat (ratNormalize (ratNum r) (ratDenPred r)) r :=",
+     "Eq Rat (ratNormalize (ratNum r) (ratDenPred r)) ratZero :="),
+    ("wrong-normalize-idempotent", "ratNormalizeIdempotent",
+     "(ratNormalize n d) :=", "ratZero :="),
+    ("wrong-normalize-of-int", "ratNormalizeOfInt",
+     "Eq Rat (ratNormalize n zero) (ratOfInt n) :=",
+     "Eq Rat (ratNormalize n zero) ratZero :="),
+]
 
 # These are the four order fields of OrderedField that accept erased
 # hypotheses, specialized to Int. Checking the aliases detects quantity
@@ -890,6 +1024,103 @@ check probeDvdCancelSummand
 check probeZeroDvdZero
 check probeZeroAntisymm
 check probeQuotientUnique
+"""
+
+def int_term(value):
+    """Encode signed oracle values using the canonical integer constructors."""
+    return f"(pos {nat_term(value)})" if value >= 0 else f"(negsucc {nat_term(-value - 1)})"
+
+def div_value_claim(name, numerator, divisor, expected):
+    n, d, q = map(nat_term, (numerator, divisor, expected))
+    return (f"\ndef {name} : Eq Nat (natDiv {n} {d}) {q} :=\n"
+            f"  refl Nat {q}\ncheck {name}\n")
+
+def normalized_value_claim(name, numerator, denominator, projection, expected):
+    """The API stores a denominator predecessor; Fraction uses its value."""
+    n, d = int_term(numerator), nat_term(denominator - 1)
+    carrier, result = ("Int", int_term(expected)) if projection == "ratNum" else ("Nat", nat_term(expected))
+    return (f"\ndef {name} : Eq {carrier} ({projection} (ratNormalize {n} {d})) {result} :=\n"
+            f"  refl {carrier} {result}\ncheck {name}\n")
+
+DIV_INPUTS = [(n, d) for n in range(13) for d in range(7)]
+DIV_VALUES = "".join(
+    div_value_claim(f"divValue{n}x{d}", n, d, n // d if d else 0)
+    for n, d in DIV_INPUTS)
+
+# Fractions supplies an independent canonical numerator and denominator.
+# The grid covers both signs, zero, unit denominators, common factors and
+# coprime inputs. Larger cases exercise several gcd and division steps.
+NORMALIZE_INPUTS = ([(n, d) for n in range(-8, 9) for d in range(1, 7)]
+                   + [(12, 18), (18, 12), (-12, 18), (-18, 12),
+                      (21, 14), (-21, 14), (14, 21), (-14, 21),
+                      (17, 13), (-17, 13), (0, 24), (24, 16)])
+NORMALIZE_VALUES = "".join(
+    normalized_value_claim(f"ratValueNum{i}", n, d, "ratNum", Fraction(n, d).numerator)
+    + normalized_value_claim(f"ratValueDen{i}", n, d, "ratDen", Fraction(n, d).denominator)
+    for i, (n, d) in enumerate(NORMALIZE_INPUTS))
+
+RAT_SHAPES = """
+def ratProofUniqueShape : (a : Nat) -> (b : Nat) ->
+    (0 p : Eq Nat a b) -> (0 q : Eq Nat a b) -> Eq (Eq Nat a b) p q :=
+  natEqProofUnique
+def ratSameShape : (n : Int) -> (d : Nat) ->
+    (0 p : Eq Nat (gcd (natAbs n) (succ d)) one) ->
+    (0 q : Eq Nat (gcd (natAbs n) (succ d)) one) ->
+    Eq Rat (rat n d p) (rat n d q) :=
+  ratSame
+def ratExtShape : (r : Rat) -> (s : Rat) ->
+    (0 hn : Eq Int (ratNum r) (ratNum s)) ->
+    (0 hd : Eq Nat (ratDen r) (ratDen s)) -> Eq Rat r s :=
+  ratExt
+def ratDenNonzeroShape : (r : Rat) -> (0 h : Eq Nat (ratDen r) zero) -> Empty :=
+  ratDenNeZero
+def ratCtorShape : (n : Int) -> (d : Nat) ->
+    (0 p : Eq Nat (gcd (natAbs n) (succ d)) one) -> Rat :=
+  rat
+def ratSelectShape : (a : Nat) -> (b : Nat) ->
+    (0 h : Eq Nat a b) -> Eq Nat a b :=
+  natEqSelect
+def ratNormalizeCorrectShape : (a : Nat) -> (b : Nat) ->
+    (0 p : Eq Nat a b) -> Eq (Eq Nat a b) (natEqNormalize a b p) p :=
+  natEqNormalizeCorrect
+def ratIntInjectiveShape : (n : Int) -> (m : Int) ->
+    (0 h : Eq Rat (ratOfInt n) (ratOfInt m)) -> Eq Int n m :=
+  ratOfIntInjective
+def ratZeroNeOneShape : (0 h : Eq Rat ratZero ratOne) -> Empty :=
+  ratZeroNeOne
+check ratProofUniqueShape
+check ratSameShape
+check ratExtShape
+check ratDenNonzeroShape
+check ratCtorShape
+check ratSelectShape
+check ratNormalizeCorrectShape
+check ratIntInjectiveShape
+check ratZeroNeOneShape
+"""
+
+RAT_CONTRACT_EXAMPLES = GCD_DIVISIBILITY + """
+def ratOpaqueCertificate : Eq Nat (gcd zero one) one := gcdOneRight zero
+def ratProofIndependent : Eq Rat (rat intZero zero ratOpaqueCertificate) ratZero :=
+  ratSame intZero zero ratOpaqueCertificate (gcdOneRight zero)
+def ratProofIndependentNum : Eq Int (ratNum (rat intZero zero ratOpaqueCertificate)) intZero :=
+  refl Int intZero
+def ratProofIndependentDen : Eq Nat (ratDen (rat intZero zero ratOpaqueCertificate)) one :=
+  refl Nat one
+def reduceProbeQuotients : Eq Nat (gcd probeThree probeTwo) one :=
+  gcdReducedQuotients probeSix probeFour probeThree probeTwo
+    (fun e => zeroNotSucc one (sym0 Nat probeTwo zero e))
+    (refl Nat probeSix) (refl Nat probeFour)
+def signedDivProbeExact : Eq Int (intMul (pos probeTwo)
+    (signedDiv (negsucc (succ probeFour)) probeTwo)) (negsucc (succ probeFour)) :=
+  signedDivExact (negsucc (succ probeFour)) probeTwo
+    (fun e => zeroNotSucc one (sym0 Nat probeTwo zero e)) probeTwoDvdSix
+check ratOpaqueCertificate
+check ratProofIndependent
+check ratProofIndependentNum
+check ratProofIndependentDen
+check reduceProbeQuotients
+check signedDivProbeExact
 """
 
 # A case is (name, full source, expected diagnostic word).
@@ -973,6 +1204,37 @@ CASES = [
     (name, mutate_gcd_header(def_name, old, new), "mismatch")
     for name, def_name, old, new in GCD_NEGATIVES]
 
+M4D_NEGATIVES = [(name, file_name, def_name, old, new)
+                 for file_name, negatives in [("Div", DIV_NEGATIVES),
+                                              ("Reduce", REDUCE_NEGATIVES),
+                                              ("Rat", RAT_NEGATIVES),
+                                              ("RatNormalize", NORMALIZE_NEGATIVES)]
+                 for name, def_name, old, new in negatives]
+CASES += [(name, mutate_header(file_name, def_name, old, new), "mismatch")
+          for name, file_name, def_name, old, new in M4D_NEGATIVES] + [
+    ("div-computation-grid", BASE + DIV_VALUES, None),
+    ("rat-normalization-grid", BASE + NORMALIZE_VALUES, None),
+    ("rat-erased-proof-shapes", BASE + RAT_SHAPES, None),
+    ("rat-contract-examples", BASE + RAT_CONTRACT_EXAMPLES, None),
+    ("wrong-div-value", BASE + div_value_claim("wrongDivValue", 7, 2, 4), "mismatch"),
+    ("wrong-div-zero-value", BASE + div_value_claim("wrongDivZeroValue", 3, 0, 1), "mismatch"),
+    ("wrong-rat-num-value", BASE + normalized_value_claim("wrongRatNum", -6, 4, "ratNum", 3), "mismatch"),
+    ("wrong-rat-den-value", BASE + normalized_value_claim("wrongRatDen", 6, 4, "ratDen", 4), "mismatch"),
+    ("invalid-rat-reduced-certificate", BASE + "\ndef invalidRatReduced : Rat :=\n"
+     "  rat (pos (succ one)) one (refl Nat one)\ncheck invalidRatReduced\n", "mismatch"),
+    ("invalid-rat-zero-denominator", BASE + "\ndef invalidRatDenZero :\n"
+     "    Eq Nat (ratDen (rat intZero zero (refl Nat one))) zero :=\n"
+     "  refl Nat zero\ncheck invalidRatDenZero\n", "mismatch"),
+    ("wrong-div-initial-fuel", mutate_in_def("Div", "natDiv",
+     "| succ p => natDivFuel (succ n) n p", "| succ p => natDivFuel zero n p"), "mismatch"),
+    ("opaque-div-computation", mutate_header("Div", "natDiv",
+     "reducible def natDiv", "def natDiv"), "mismatch"),
+    ("opaque-rat-normalization", mutate_header("RatNormalize", "ratNormalize",
+     "reducible def ratNormalize", "def ratNormalize"), "mismatch"),
+    ("invalid-rat-zero-reduced-certificate", BASE + "\ndef invalidRatZeroReduced : Rat :=\n"
+     "  rat intZero one (refl Nat one)\ncheck invalidRatZeroReduced\n", "mismatch"),
+]
+
 # The def that must fail first, for every case that M3a adds. The name
 # comes from the position of the diagnostic, so a mutation that moves the
 # rejection to another def is a failure of the case.
@@ -1001,6 +1263,18 @@ FAILING_DEFS = {
        for name, def_name, _old, _new in INT_NEGATIVES},
     **{name: def_name
        for name, def_name, _old, _new in GCD_NEGATIVES},
+    **{name: def_name
+       for name, _file, def_name, _old, _new in M4D_NEGATIVES},
+    "wrong-div-value": "wrongDivValue",
+    "wrong-div-zero-value": "wrongDivZeroValue",
+    "wrong-rat-num-value": "wrongRatNum",
+    "wrong-rat-den-value": "wrongRatDen",
+    "invalid-rat-reduced-certificate": "invalidRatReduced",
+    "invalid-rat-zero-denominator": "invalidRatDenZero",
+    "wrong-div-initial-fuel": "natDivExact",
+    "opaque-div-computation": "natDivExact",
+    "opaque-rat-normalization": "ratNormalizeNum",
+    "invalid-rat-zero-reduced-certificate": "invalidRatZeroReduced",
 }
 
 def failing_def(source, result):

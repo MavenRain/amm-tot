@@ -1,0 +1,56 @@
+-- Reduction of natural fractions by their gcd. This file follows Gcd.tot.
+-- The quotient values are explicit: reconstruction equations certify
+-- them without making computation inspect an opaque divisibility proof.
+
+def natDvdScaleLeft : (c : Nat) -> (d : Nat) -> (n : Nat) ->
+    NatDvd d n -> NatDvd (mul c d) (mul c n) :=
+  fun c d n h => match h as w return NatDvd (mul c d) (mul c n) with
+    | dvdWitness k e => dvdWitness (mul c d) (mul c n) k
+        (trans0 Nat (mul (mul c d) k) (mul c (mul d k)) (mul c n)
+          (mulAssoc c d k)
+          (cong0 Nat Nat (mul d k) n (fun z => mul c z) e))
+    end
+
+def natDvdCancelScaleLeft : (c : Nat) -> (d : Nat) -> (n : Nat) ->
+    (Eq Nat c zero -> Empty) ->
+    NatDvd (mul c d) (mul c n) -> NatDvd d n :=
+  fun c d n hc h => match h as w return NatDvd d n with
+    | dvdWitness k e => dvdWitness d n k
+        (natMulCancelLeft c (mul d k) n hc
+          (trans0 Nat (mul c (mul d k)) (mul (mul c d) k) (mul c n)
+            (sym0 Nat (mul (mul c d) k) (mul c (mul d k)) (mulAssoc c d k)) e))
+    end
+
+def natDvdOfScaleDvdSelf : (c : Nat) -> (d : Nat) ->
+    (Eq Nat c zero -> Empty) -> NatDvd (mul c d) c -> NatDvd d one :=
+  fun c d hc h => natDvdCancelScaleLeft c d one hc
+    (natDvdTransport (mul c d) c (mul c one)
+      (sym0 Nat (mul c one) c (mulOne c)) h)
+
+def gcdReducedCommonDivisor : (a : Nat) -> (b : Nat) ->
+    (x : Nat) -> (y : Nat) -> (d : Nat) ->
+    (Eq Nat (gcd a b) zero -> Empty) ->
+    Eq Nat (mul (gcd a b) x) a -> Eq Nat (mul (gcd a b) y) b ->
+    NatDvd d x -> NatDvd d y -> NatDvd d one :=
+  fun a b x y d hg hx hy hdx hdy => natDvdOfScaleDvdSelf (gcd a b) d hg
+    (gcdGreatest a b (mul (gcd a b) d)
+      (natDvdTransport (mul (gcd a b) d) (mul (gcd a b) x) a hx
+        (natDvdScaleLeft (gcd a b) d x hdx))
+      (natDvdTransport (mul (gcd a b) d) (mul (gcd a b) y) b hy
+        (natDvdScaleLeft (gcd a b) d y hdy)))
+
+def gcdReducedQuotients : (a : Nat) -> (b : Nat) ->
+    (x : Nat) -> (y : Nat) ->
+    (Eq Nat (gcd a b) zero -> Empty) ->
+    Eq Nat (mul (gcd a b) x) a -> Eq Nat (mul (gcd a b) y) b ->
+    Eq Nat (gcd x y) one :=
+  fun a b x y hg hx hy => natDvdAntisymm (gcd x y) one
+    (gcdReducedCommonDivisor a b x y (gcd x y) hg hx hy
+      (gcdDvdLeft x y) (gcdDvdRight x y))
+    (natOneDvd (gcd x y))
+
+check natDvdScaleLeft
+check natDvdCancelScaleLeft
+check natDvdOfScaleDvdSelf
+check gcdReducedCommonDivisor
+check gcdReducedQuotients

@@ -1,0 +1,166 @@
+-- Natural division and exact quotients, a prerequisite for M4d.
+-- Computing functions stay reducible and never inspect opaque proofs.
+-- The worker takes the predecessor of its positive divisor. Its public
+-- wrapper supplies sufficient fuel and defines division by zero as zero.
+
+reducible def natDivStep : (n : Nat) -> (p : Nat) ->
+    GcdCompare n (succ p) -> (Nat -> Nat) -> Nat :=
+  fun n p c next => match c with
+    | gcdLess k e => zero
+    | gcdSame e => one
+    | gcdGreater k e => succ (next (succ k))
+    end
+
+-- The fuel worker is total, so it returns zero when the fuel runs out.
+-- Only natDiv is safe to call: it supplies succ n, the bound that
+-- natDivFuelExact requires. natDivFuel needs that bound from its caller.
+reducible def rec natDivFuel : Nat -> Nat -> Nat -> Nat :=
+  fun fuel n p => match fuel with
+    | zero => zero
+    | succ f => natDivStep n p (gcdCompare n (succ p))
+        (fun r => natDivFuel f r p)
+    end
+
+reducible def natDiv : Nat -> Nat -> Nat :=
+  fun n d => match d with
+    | zero => zero
+    | succ p => natDivFuel (succ n) n p
+    end
+
+def natDvdSmallZero : (n : Nat) -> (d : Nat) ->
+    NatDvd d n -> NatLt n d -> Eq Nat n zero :=
+  fun n d h lt => match h as w return Eq Nat n zero with
+    | dvdWitness q eq =>
+        (match q as x return Eq Nat (mul d x) n -> Eq Nat n zero with
+         | zero => fun e => trans0 Nat n (mul d zero) zero
+             (sym0 Nat (mul d zero) n e) (mulZeroRight d)
+         | succ k => fun e =>
+             match lt as small return Eq Nat n zero with
+             | ltWitness r er =>
+                 match ltIrrefl n
+                   (subst0 Nat d n (fun z => NatLt n z)
+                     (natAddCycle d n (mul d k) (succ r)
+                       (trans0 Nat (add d (mul d k)) (mul d (succ k)) n
+                         (sym0 Nat (mul d (succ k)) (add d (mul d k))
+                           (mulSuccRight d k)) e) er) lt)
+                   as impossible return Eq Nat n zero with end
+             end
+         end) eq
+    end
+
+def natDivStepExact : (f : Nat) -> (n : Nat) -> (p : Nat) ->
+    (next : Nat -> Nat) ->
+    ((r : Nat) -> NatLt r f -> NatDvd (succ p) r ->
+      Eq Nat (mul (succ p) (next r)) r) ->
+    NatLt n (succ f) -> NatDvd (succ p) n ->
+    (c : GcdCompare n (succ p)) ->
+    Eq Nat (mul (succ p) (natDivStep n p c next)) n :=
+  fun f n p next ih bound h c =>
+    match c as t return Eq Nat (mul (succ p) (natDivStep n p t next)) n with
+    | gcdLess k e => trans0 Nat (mul (succ p) zero) zero n
+        (mulZeroRight (succ p))
+        (sym0 Nat n zero (natDvdSmallZero n (succ p) h
+          (ltWitness n (succ p) k e)))
+    | gcdSame e => trans0 Nat (mul (succ p) one) (succ p) n
+        (mulOne (succ p)) (sym0 Nat n (succ p) e)
+    | gcdGreater k e => trans0 Nat (mul (succ p) (succ (next (succ k))))
+        (add (succ p) (mul (succ p) (next (succ k)))) n
+        (mulSuccRight (succ p) (next (succ k)))
+        (trans0 Nat (add (succ p) (mul (succ p) (next (succ k))))
+          (add (succ p) (succ k)) n
+          (cong0 Nat Nat (mul (succ p) (next (succ k))) (succ k)
+            (fun z => add (succ p) z)
+            (ih (succ k)
+              (gcdBoundLeft p (succ k) f
+                (subst0 Nat n (add (succ p) (succ k))
+                  (fun z => NatLt z (succ f))
+                  (sym0 Nat (add (succ p) (succ k)) n e) bound))
+              (natDvdOfDvdAdd (succ p) (succ p) (succ k)
+                (natDvdRefl (succ p))
+                (natDvdTransport (succ p) n (add (succ p) (succ k))
+                  (sym0 Nat (add (succ p) (succ k)) n e) h)))) e)
+    end
+
+def rec natDivFuelExact : (fuel : Nat) -> (n : Nat) -> (p : Nat) ->
+    NatLt n fuel -> NatDvd (succ p) n ->
+    Eq Nat (mul (succ p) (natDivFuel fuel n p)) n :=
+  fun fuel => match fuel as z return (n : Nat) -> (p : Nat) ->
+      NatLt n z -> NatDvd (succ p) n ->
+      Eq Nat (mul (succ p) (natDivFuel z n p)) n with
+    | zero => fun n p bound h =>
+        match gcdLtZero n bound as impossible
+          return Eq Nat (mul (succ p) zero) n with end
+    | succ f => fun n p bound h => natDivStepExact f n p
+        (fun r => natDivFuel f r p)
+        (fun r hr hd => natDivFuelExact f r p hr hd)
+        bound h (gcdCompare n (succ p))
+    end
+
+def natLtSuccSelf : (n : Nat) -> NatLt n (succ n) :=
+  fun n => ltWitness n (succ n) zero
+    (trans0 Nat (add n (succ zero)) (succ (add n zero)) (succ n)
+      (addSuccRight n zero)
+      (cong0 Nat Nat (add n zero) n succ (addZero n)))
+
+def natDivExact : (n : Nat) -> (d : Nat) ->
+    (Eq Nat d zero -> Empty) -> NatDvd d n ->
+    Eq Nat (mul d (natDiv n d)) n :=
+  fun n d => match d as x return (Eq Nat x zero -> Empty) ->
+      NatDvd x n -> Eq Nat (mul x (natDiv n x)) n with
+    | zero => fun hd h => match hd (refl Nat zero) as impossible
+        return Eq Nat (mul zero (natDiv n zero)) n with end
+    | succ p => fun hd h => natDivFuelExact (succ n) n p (natLtSuccSelf n) h
+    end
+
+def natDivUnique : (n : Nat) -> (d : Nat) -> (q : Nat) ->
+    (Eq Nat d zero -> Empty) -> Eq Nat (mul d q) n ->
+    Eq Nat (natDiv n d) q :=
+  fun n d q hd e => natDvdWitnessUnique d n (natDiv n d) q hd
+    (natDivExact n d hd (dvdWitness d n q e)) e
+
+def natDivNeZero : (n : Nat) -> (d : Nat) ->
+    (Eq Nat n zero -> Empty) -> (Eq Nat d zero -> Empty) ->
+    NatDvd d n -> Eq Nat (natDiv n d) zero -> Empty :=
+  fun n d hn hd h e => hn
+    (trans0 Nat n (mul d (natDiv n d)) zero
+      (sym0 Nat (mul d (natDiv n d)) n (natDivExact n d hd h))
+      (trans0 Nat (mul d (natDiv n d)) (mul d zero) zero
+        (cong0 Nat Nat (natDiv n d) zero (fun z => mul d z) e)
+        (mulZeroRight d)))
+
+def natDivZeroLeft : (d : Nat) -> Eq Nat (natDiv zero d) zero :=
+  fun d => match d as x return Eq Nat (natDiv zero x) zero with
+    | zero => refl Nat zero
+    | succ p => refl Nat zero
+    end
+
+def natDivZeroRight : (n : Nat) -> Eq Nat (natDiv n zero) zero :=
+  fun n => refl Nat zero
+
+def natDivOne : (n : Nat) -> Eq Nat (natDiv n one) n :=
+  fun n => natDivUnique n one n
+    (fun e => zeroNotSucc zero (sym0 Nat one zero e)) (addZero n)
+
+def natDivSelf : (n : Nat) -> (Eq Nat n zero -> Empty) ->
+    Eq Nat (natDiv n n) one :=
+  fun n hn => natDivUnique n n one hn (mulOne n)
+
+def natDivMul : (d : Nat) -> (q : Nat) -> (Eq Nat d zero -> Empty) ->
+    Eq Nat (natDiv (mul d q) d) q :=
+  fun d q hd => natDivUnique (mul d q) d q hd (refl Nat (mul d q))
+
+check natDivStep
+check natDivFuel
+check natDiv
+check natDvdSmallZero
+check natDivStepExact
+check natDivFuelExact
+check natLtSuccSelf
+check natDivExact
+check natDivUnique
+check natDivNeZero
+check natDivZeroLeft
+check natDivZeroRight
+check natDivOne
+check natDivSelf
+check natDivMul

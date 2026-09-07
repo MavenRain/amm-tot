@@ -1,0 +1,163 @@
+-- Canonical rational representation. The denominator is a successor,
+-- so zero denominators cannot be constructed. The erased gcd certificate
+-- enforces reduction; its proof is irrelevant by Nat equality uniqueness,
+-- proved constructively below using decidable equality and path induction.
+
+reducible def natEqCopy : (0 a : Nat) -> (0 b : Nat) ->
+    (0 h : Eq Nat a b) -> Eq Nat a b :=
+  fun a b h => cong0 Nat Nat a b (fun z => z) h
+
+reducible def natEqSelectBy : (a : Nat) -> (b : Nat) ->
+    Dec (Eq Nat a b) -> (0 h : Eq Nat a b) -> Eq Nat a b :=
+  fun a b d h => match d with
+    | yes p => natEqCopy a b p
+    | no f => match f (natEqCopy a b h) as impossible return Eq Nat a b with end
+    end
+
+reducible def natEqSelect : (a : Nat) -> (b : Nat) ->
+    (0 h : Eq Nat a b) -> Eq Nat a b :=
+  fun a b h => natEqSelectBy a b (natDecEq a b) h
+
+def natEqSelectConstant : (a : Nat) -> (b : Nat) ->
+    (0 p : Eq Nat a b) -> (0 q : Eq Nat a b) ->
+    Eq (Eq Nat a b) (natEqSelect a b p) (natEqSelect a b q) :=
+  fun a b p q => match natDecEq a b as d return
+      Eq (Eq Nat a b) (natEqSelectBy a b d p) (natEqSelectBy a b d q) with
+    | yes h => refl (Eq Nat a b) (natEqCopy a b h)
+    | no f => match f (natEqCopy a b p) as impossible return
+        Eq (Eq Nat a b) (natEqSelectBy a b (no (Eq Nat a b) f) p)
+          (natEqSelectBy a b (no (Eq Nat a b) f) q) with end
+    end
+
+def natEqSymTrans : (0 a : Nat) -> (0 b : Nat) -> (0 p : Eq Nat a b) ->
+    Eq (Eq Nat b b) (trans0 Nat b a b (sym0 Nat a b p) p) (refl Nat b) :=
+  fun a b p => match p as h in Eq y return
+      Eq (Eq Nat y y) (trans0 Nat y a y (sym0 Nat a y h) h) (refl Nat y) with
+    | refl => refl (Eq Nat a a) (refl Nat a)
+    end
+
+reducible def natEqNormalize : (a : Nat) -> (b : Nat) ->
+    (0 h : Eq Nat a b) -> Eq Nat a b :=
+  fun a b h => trans0 Nat a a b
+    (sym0 Nat a a (natEqSelect a a (refl Nat a))) (natEqSelect a b h)
+
+def natEqNormalizeCorrect : (a : Nat) -> (b : Nat) -> (0 p : Eq Nat a b) ->
+    Eq (Eq Nat a b) (natEqNormalize a b p) p :=
+  fun a b p => J0 Nat a
+    (fun y h => Eq (Eq Nat a y) (natEqNormalize a y h) h)
+    (natEqSymTrans a a (natEqSelect a a (refl Nat a))) b p
+
+def natEqProofUnique : (a : Nat) -> (b : Nat) ->
+    (0 p : Eq Nat a b) -> (0 q : Eq Nat a b) -> Eq (Eq Nat a b) p q :=
+  fun a b p q => trans0 (Eq Nat a b) p (natEqNormalize a b p) q
+    (sym0 (Eq Nat a b) (natEqNormalize a b p) p (natEqNormalizeCorrect a b p))
+    (trans0 (Eq Nat a b) (natEqNormalize a b p) (natEqNormalize a b q) q
+      (cong0 (Eq Nat a b) (Eq Nat a b) (natEqSelect a b p) (natEqSelect a b q)
+        (fun h => trans0 Nat a a b (sym0 Nat a a (natEqSelect a a (refl Nat a))) h)
+        (natEqSelectConstant a b p q))
+      (natEqNormalizeCorrect a b q))
+
+data Rat : Type 0 :=
+  | rat : (num : Int) -> (denPred : Nat) ->
+      (0 reduced : Eq Nat (gcd (natAbs num) (succ denPred)) one) -> Rat
+
+reducible def ratNum : Rat -> Int :=
+  fun r => match r with | rat n d p => n end
+
+reducible def ratDenPred : Rat -> Nat :=
+  fun r => match r with | rat n d p => d end
+
+reducible def ratDen : Rat -> Nat := fun r => succ (ratDenPred r)
+
+def ratReduced : (r : Rat) -> Eq Nat (gcd (natAbs (ratNum r)) (ratDen r)) one :=
+  fun r => match r as x return Eq Nat (gcd (natAbs (ratNum x)) (ratDen x)) one with
+    | rat n d p => natEqCopy (gcd (natAbs n) (succ d)) one p
+    end
+
+def ratSame : (n : Int) -> (d : Nat) ->
+    (0 p : Eq Nat (gcd (natAbs n) (succ d)) one) ->
+    (0 q : Eq Nat (gcd (natAbs n) (succ d)) one) ->
+    Eq Rat (rat n d p) (rat n d q) :=
+  fun n d p q => cong0 (Eq Nat (gcd (natAbs n) (succ d)) one) Rat p q
+    (fun h => rat n d h) (natEqProofUnique (gcd (natAbs n) (succ d)) one p q)
+
+def ratCtorExt : (n : Int) -> (m : Int) -> (d : Nat) -> (e : Nat) ->
+    (0 p : Eq Nat (gcd (natAbs n) (succ d)) one) ->
+    (0 q : Eq Nat (gcd (natAbs m) (succ e)) one) ->
+    (0 hn : Eq Int n m) -> (0 hd : Eq Nat d e) ->
+    Eq Rat (rat n d p) (rat m e q) :=
+  fun n m d e p q hn hd =>
+    (match hn as h in Eq x return
+        (0 qx : Eq Nat (gcd (natAbs x) (succ e)) one) ->
+        Eq Rat (rat n d p) (rat x e qx) with
+     | refl => fun qx =>
+         (match hd as h2 in Eq y return
+             (0 qy : Eq Nat (gcd (natAbs n) (succ y)) one) ->
+             Eq Rat (rat n d p) (rat n y qy) with
+          | refl => fun qy => ratSame n d p qy
+          end) qx
+     end) q
+
+def ratExt : (r : Rat) -> (s : Rat) ->
+    (0 hn : Eq Int (ratNum r) (ratNum s)) ->
+    (0 hd : Eq Nat (ratDen r) (ratDen s)) -> Eq Rat r s :=
+  fun r => match r as x return (s : Rat) ->
+      (0 hn : Eq Int (ratNum x) (ratNum s)) ->
+      (0 hd : Eq Nat (ratDen x) (ratDen s)) -> Eq Rat x s with
+    | rat n d p => fun s => match s as y return
+        (0 hn : Eq Int n (ratNum y)) ->
+        (0 hd : Eq Nat (succ d) (ratDen y)) -> Eq Rat (rat n d p) y with
+        | rat m e q => fun hn hd => ratCtorExt n m d e p q hn (succInj d e hd)
+        end
+    end
+
+reducible def ratOfInt : Int -> Rat :=
+  fun n => rat n zero (gcdOneRight (natAbs n))
+
+reducible def ratZero : Rat := ratOfInt intZero
+
+reducible def ratOne : Rat := ratOfInt intOne
+
+def ratNumOfInt : (n : Int) -> Eq Int (ratNum (ratOfInt n)) n :=
+  fun n => refl Int n
+
+def ratDenOfInt : (n : Int) -> Eq Nat (ratDen (ratOfInt n)) one :=
+  fun n => refl Nat one
+
+def ratDenPos : (r : Rat) -> NatLt zero (ratDen r) :=
+  fun r => ltWitness zero (ratDen r) (ratDenPred r) (refl Nat (ratDen r))
+
+def ratDenNeZero : (r : Rat) -> (0 h : Eq Nat (ratDen r) zero) -> Empty :=
+  fun r h => zeroNotSucc (ratDenPred r) (sym0 Nat (ratDen r) zero h)
+
+def ratOfIntInjective : (n : Int) -> (m : Int) ->
+    (0 h : Eq Rat (ratOfInt n) (ratOfInt m)) -> Eq Int n m :=
+  fun n m h => cong0 Rat Int (ratOfInt n) (ratOfInt m) ratNum h
+
+def ratZeroNeOne : (0 h : Eq Rat ratZero ratOne) -> Empty :=
+  fun h => intZeroNeOne (ratOfIntInjective intZero intOne h)
+
+check natEqCopy
+check natEqSelectBy
+check natEqSelect
+check natEqSelectConstant
+check natEqSymTrans
+check natEqNormalize
+check natEqNormalizeCorrect
+check natEqProofUnique
+check ratNum
+check ratDenPred
+check ratDen
+check ratReduced
+check ratSame
+check ratCtorExt
+check ratExt
+check ratOfInt
+check ratZero
+check ratOne
+check ratNumOfInt
+check ratDenOfInt
+check ratDenPos
+check ratDenNeZero
+check ratOfIntInjective
+check ratZeroNeOne

@@ -1,0 +1,196 @@
+-- Normalize an integer numerator over the positive denominator succ d.
+-- Division computes independently of the opaque divisibility proofs.
+-- The result stores only the reduced numerator, denominator predecessor
+-- and an erased certificate. No quotient or additional axiom is used.
+
+reducible def signedDiv : Int -> Nat -> Int :=
+  fun n g => match n with
+    | pos a => pos (natDiv a g)
+    | negsucc a => negOfNat (natDiv (succ a) g)
+    end
+
+def signedDivAbs : (n : Int) -> (g : Nat) ->
+    Eq Nat (natAbs (signedDiv n g)) (natDiv (natAbs n) g) :=
+  fun n g => match n as z return
+      Eq Nat (natAbs (signedDiv z g)) (natDiv (natAbs z) g) with
+    | pos a => refl Nat (natDiv a g)
+    | negsucc a => natAbsNegOfNat (natDiv (succ a) g)
+    end
+
+def signedDivExact : (n : Int) -> (g : Nat) ->
+    (Eq Nat g zero -> Empty) -> NatDvd g (natAbs n) ->
+    Eq Int (intMul (pos g) (signedDiv n g)) n :=
+  fun n g hg => match n as z return NatDvd g (natAbs z) ->
+      Eq Int (intMul (pos g) (signedDiv z g)) z with
+    | pos a => fun h => cong0 Nat Int (mul g (natDiv a g)) a pos
+        (natDivExact a g hg h)
+    | negsucc a => fun h => trans0 Int
+        (intMul (pos g) (negOfNat (natDiv (succ a) g)))
+        (negOfNat (mul g (natDiv (succ a) g))) (negsucc a)
+        (intMulNeg (pos g) (pos (natDiv (succ a) g)))
+        (cong0 Nat Int (mul g (natDiv (succ a) g)) (succ a) negOfNat
+          (natDivExact (succ a) g hg h))
+    end
+
+reducible def ratCommonDivisor : Int -> Nat -> Nat :=
+  fun n d => gcd (natAbs n) (succ d)
+
+reducible def ratReducedDen : Int -> Nat -> Nat :=
+  fun n d => natDiv (succ d) (ratCommonDivisor n d)
+
+def ratCommonDivisorNeZero : (n : Int) -> (d : Nat) ->
+    Eq Nat (ratCommonDivisor n d) zero -> Empty :=
+  fun n d => gcdNeZeroRight (natAbs n) (succ d)
+    (fun e => zeroNotSucc d (sym0 Nat (succ d) zero e))
+
+def ratReducedDenNeZero : (n : Int) -> (d : Nat) ->
+    Eq Nat (ratReducedDen n d) zero -> Empty :=
+  fun n d => natDivNeZero (succ d) (ratCommonDivisor n d)
+    (fun e => zeroNotSucc d (sym0 Nat (succ d) zero e))
+    (ratCommonDivisorNeZero n d) (gcdDvdRight (natAbs n) (succ d))
+
+def natSuccPredOfNeZero : (n : Nat) -> (Eq Nat n zero -> Empty) ->
+    Eq Nat (succ (pred n)) n :=
+  fun n => match n as x return (Eq Nat x zero -> Empty) ->
+      Eq Nat (succ (pred x)) x with
+    | zero => fun hn => match hn (refl Nat zero) as impossible
+        return Eq Nat (succ (pred zero)) zero with end
+    | succ p => fun hn => refl Nat (succ p)
+    end
+
+def ratNormalizeReduced : (n : Int) -> (d : Nat) ->
+    Eq Nat (gcd (natAbs (signedDiv n (ratCommonDivisor n d)))
+      (succ (pred (ratReducedDen n d)))) one :=
+  fun n d => trans0 Nat
+    (gcd (natAbs (signedDiv n (ratCommonDivisor n d)))
+      (succ (pred (ratReducedDen n d))))
+    (gcd (natDiv (natAbs n) (ratCommonDivisor n d)) (ratReducedDen n d)) one
+    (trans0 Nat
+      (gcd (natAbs (signedDiv n (ratCommonDivisor n d)))
+        (succ (pred (ratReducedDen n d))))
+      (gcd (natDiv (natAbs n) (ratCommonDivisor n d))
+        (succ (pred (ratReducedDen n d))))
+      (gcd (natDiv (natAbs n) (ratCommonDivisor n d)) (ratReducedDen n d))
+      (cong0 Nat Nat (natAbs (signedDiv n (ratCommonDivisor n d)))
+        (natDiv (natAbs n) (ratCommonDivisor n d))
+        (fun z => gcd z (succ (pred (ratReducedDen n d))))
+        (signedDivAbs n (ratCommonDivisor n d)))
+      (cong0 Nat Nat (succ (pred (ratReducedDen n d))) (ratReducedDen n d)
+        (fun z => gcd (natDiv (natAbs n) (ratCommonDivisor n d)) z)
+        (natSuccPredOfNeZero (ratReducedDen n d) (ratReducedDenNeZero n d))))
+    (gcdReducedQuotients (natAbs n) (succ d)
+      (natDiv (natAbs n) (ratCommonDivisor n d)) (ratReducedDen n d)
+      (ratCommonDivisorNeZero n d)
+      (natDivExact (natAbs n) (ratCommonDivisor n d)
+        (ratCommonDivisorNeZero n d) (gcdDvdLeft (natAbs n) (succ d)))
+      (natDivExact (succ d) (ratCommonDivisor n d)
+        (ratCommonDivisorNeZero n d) (gcdDvdRight (natAbs n) (succ d))))
+
+reducible def ratNormalize : Int -> Nat -> Rat :=
+  fun n d => rat (signedDiv n (ratCommonDivisor n d))
+    (pred (ratReducedDen n d)) (ratNormalizeReduced n d)
+
+def ratNormalizeNum : (n : Int) -> (d : Nat) ->
+    Eq Int (ratNum (ratNormalize n d)) (signedDiv n (ratCommonDivisor n d)) :=
+  fun n d => refl Int (signedDiv n (ratCommonDivisor n d))
+
+def ratNormalizeDen : (n : Int) -> (d : Nat) ->
+    Eq Nat (ratDen (ratNormalize n d)) (ratReducedDen n d) :=
+  fun n d => natSuccPredOfNeZero (ratReducedDen n d) (ratReducedDenNeZero n d)
+
+def ratNormalizeNumExact : (n : Int) -> (d : Nat) ->
+    Eq Int (intMul (pos (ratCommonDivisor n d)) (ratNum (ratNormalize n d))) n :=
+  fun n d => signedDivExact n (ratCommonDivisor n d)
+    (ratCommonDivisorNeZero n d) (gcdDvdLeft (natAbs n) (succ d))
+
+def ratNormalizeDenExact : (n : Int) -> (d : Nat) ->
+    Eq Nat (mul (ratCommonDivisor n d) (ratDen (ratNormalize n d))) (succ d) :=
+  fun n d => trans0 Nat
+    (mul (ratCommonDivisor n d) (ratDen (ratNormalize n d)))
+    (mul (ratCommonDivisor n d) (ratReducedDen n d)) (succ d)
+    (cong0 Nat Nat (ratDen (ratNormalize n d)) (ratReducedDen n d)
+      (fun z => mul (ratCommonDivisor n d) z) (ratNormalizeDen n d))
+    (natDivExact (succ d) (ratCommonDivisor n d)
+      (ratCommonDivisorNeZero n d) (gcdDvdRight (natAbs n) (succ d)))
+
+def ratScaledCross : (g : Nat) -> (n : Int) -> (d : Nat) ->
+    (x : Int) -> (y : Nat) ->
+    Eq Int (intMul (pos g) x) n -> Eq Nat (mul g y) d ->
+    Eq Int (intMul (pos d) x) (intMul n (pos y)) :=
+  fun g n d x y hn hd => trans0 Int
+    (intMul (pos d) x) (intMul (intMul (pos g) (pos y)) x) (intMul n (pos y))
+    (cong0 Nat Int d (mul g y) (fun z => intMul (pos z) x)
+      (sym0 Nat (mul g y) d hd))
+    (trans0 Int (intMul (intMul (pos g) (pos y)) x)
+      (intMul (pos g) (intMul (pos y) x)) (intMul n (pos y))
+      (intMulAssoc (pos g) (pos y) x)
+      (trans0 Int (intMul (pos g) (intMul (pos y) x))
+        (intMul (pos g) (intMul x (pos y))) (intMul n (pos y))
+        (cong0 Int Int (intMul (pos y) x) (intMul x (pos y))
+          (fun z => intMul (pos g) z) (intMulComm (pos y) x))
+        (trans0 Int (intMul (pos g) (intMul x (pos y)))
+          (intMul (intMul (pos g) x) (pos y)) (intMul n (pos y))
+          (sym0 Int (intMul (intMul (pos g) x) (pos y))
+            (intMul (pos g) (intMul x (pos y))) (intMulAssoc (pos g) x (pos y)))
+          (cong0 Int Int (intMul (pos g) x) n (fun z => intMul z (pos y)) hn))))
+
+def ratNormalizeValue : (n : Int) -> (d : Nat) ->
+    Eq Int (intMul (pos (succ d)) (ratNum (ratNormalize n d)))
+      (intMul n (pos (ratDen (ratNormalize n d)))) :=
+  fun n d => ratScaledCross (ratCommonDivisor n d) n (succ d)
+    (ratNum (ratNormalize n d)) (ratDen (ratNormalize n d))
+    (ratNormalizeNumExact n d) (ratNormalizeDenExact n d)
+
+def signedDivOne : (n : Int) -> Eq Int (signedDiv n one) n :=
+  fun n => match n as z return Eq Int (signedDiv z one) z with
+    | pos a => cong0 Nat Int (natDiv a one) a pos (natDivOne a)
+    | negsucc a => cong0 Nat Int (natDiv (succ a) one) (succ a) negOfNat
+        (natDivOne (succ a))
+    end
+
+def ratNormalizeFixed : (r : Rat) ->
+    Eq Rat (ratNormalize (ratNum r) (ratDenPred r)) r :=
+  fun r => ratExt (ratNormalize (ratNum r) (ratDenPred r)) r
+    (trans0 Int
+      (signedDiv (ratNum r) (ratCommonDivisor (ratNum r) (ratDenPred r)))
+      (signedDiv (ratNum r) one) (ratNum r)
+      (cong0 Nat Int (ratCommonDivisor (ratNum r) (ratDenPred r)) one
+        (fun g => signedDiv (ratNum r) g) (ratReduced r))
+      (signedDivOne (ratNum r)))
+    (trans0 Nat (ratDen (ratNormalize (ratNum r) (ratDenPred r)))
+      (ratReducedDen (ratNum r) (ratDenPred r)) (ratDen r)
+      (ratNormalizeDen (ratNum r) (ratDenPred r))
+      (trans0 Nat (ratReducedDen (ratNum r) (ratDenPred r))
+        (natDiv (ratDen r) one) (ratDen r)
+        (cong0 Nat Nat (ratCommonDivisor (ratNum r) (ratDenPred r)) one
+          (fun g => natDiv (ratDen r) g) (ratReduced r))
+        (natDivOne (ratDen r))))
+
+def ratNormalizeIdempotent : (n : Int) -> (d : Nat) ->
+    Eq Rat (ratNormalize (ratNum (ratNormalize n d)) (ratDenPred (ratNormalize n d)))
+      (ratNormalize n d) :=
+  fun n d => ratNormalizeFixed (ratNormalize n d)
+
+def ratNormalizeOfInt : (n : Int) -> Eq Rat (ratNormalize n zero) (ratOfInt n) :=
+  fun n => ratNormalizeFixed (ratOfInt n)
+
+check signedDiv
+check signedDivAbs
+check signedDivExact
+check ratCommonDivisor
+check ratReducedDen
+check ratCommonDivisorNeZero
+check ratReducedDenNeZero
+check natSuccPredOfNeZero
+check ratNormalizeReduced
+check ratNormalize
+check ratNormalizeNum
+check ratNormalizeDen
+check ratNormalizeNumExact
+check ratNormalizeDenExact
+check ratScaledCross
+check ratNormalizeValue
+check signedDivOne
+check ratNormalizeFixed
+check ratNormalizeIdempotent
+check ratNormalizeOfInt
