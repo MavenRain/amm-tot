@@ -1,0 +1,483 @@
+-- Divisibility and gcd on the natural numbers, M4c of the concrete
+-- carrier. Existing sources stay unchanged; this file follows Int.tot.
+-- Euclid uses structural fuel, with a separate proof that a+b+1 suffices.
+-- Computations are reducible; proofs are ordinary defs or def rec.
+
+-- Natural divisibility keeps the quotient as a constructive witness.
+-- Difference closure uses truncated subtraction and multiplication.
+data NatDvd (0 d : Nat) (0 n : Nat) : Type 0 :=
+  | dvdWitness : (k : Nat) -> (e : Eq Nat (mul d k) n) -> NatDvd d n
+
+def natDvdTransport : (d : Nat) -> (a : Nat) -> (b : Nat) ->
+    (e : Eq Nat a b) -> (h : NatDvd d a) -> NatDvd d b :=
+  fun d a b e h => subst0 Nat a b (fun z => NatDvd d z) e h
+
+def natDvdRefl : (d : Nat) -> NatDvd d d :=
+  fun d => dvdWitness d d one (mulOne d)
+
+def natDvdZero : (d : Nat) -> NatDvd d zero :=
+  fun d => dvdWitness d zero zero (mulZeroRight d)
+
+def natOneDvd : (n : Nat) -> NatDvd one n :=
+  fun n => dvdWitness one n n (addZero n)
+
+def natZeroDvd : (n : Nat) -> (h : NatDvd zero n) -> Eq Nat n zero :=
+  fun n h => match h as w return Eq Nat n zero with
+    | dvdWitness k e => sym0 Nat zero n e
+    end
+
+def natDvdTrans : (a : Nat) -> (b : Nat) -> (c : Nat) ->
+    (hab : NatDvd a b) -> (hbc : NatDvd b c) -> NatDvd a c :=
+  fun a b c hab hbc => match hab as w1 return NatDvd a c with
+    | dvdWitness k ek => match hbc as w2 return NatDvd a c with
+        | dvdWitness l el => dvdWitness a c (mul k l)
+            (trans0 Nat (mul a (mul k l)) (mul (mul a k) l) c
+              (sym0 Nat (mul (mul a k) l) (mul a (mul k l)) (mulAssoc a k l))
+              (trans0 Nat (mul (mul a k) l) (mul b l) c
+                (cong0 Nat Nat (mul a k) b (fun z => mul z l) ek) el))
+        end
+    end
+
+def natDvdAdd : (d : Nat) -> (a : Nat) -> (b : Nat) ->
+    (ha : NatDvd d a) -> (hb : NatDvd d b) -> NatDvd d (add a b) :=
+  fun d a b ha hb => match ha as w1 return NatDvd d (add a b) with
+    | dvdWitness k ek => match hb as w2 return NatDvd d (add a b) with
+        | dvdWitness l el => dvdWitness d (add a b) (add k l)
+            (trans0 Nat (mul d (add k l)) (add (mul d k) (mul d l)) (add a b)
+              (mulAdd d k l)
+              (trans0 Nat (add (mul d k) (mul d l)) (add a (mul d l)) (add a b)
+                (cong0 Nat Nat (mul d k) a (fun z => add z (mul d l)) ek)
+                (cong0 Nat Nat (mul d l) b (fun z => add a z) el)))
+        end
+    end
+
+def rec natSubAddBoth : (k : Nat) -> (a : Nat) -> (b : Nat) ->
+    Eq Nat (sub (add k a) (add k b)) (sub a b) :=
+  fun k a b => match k as x return Eq Nat (sub (add x a) (add x b)) (sub a b) with
+    | zero => refl Nat (sub a b)
+    | succ p => natSubAddBoth p a b
+    end
+
+def rec natSubMulRight : (a : Nat) -> (b : Nat) -> (d : Nat) ->
+    Eq Nat (mul (sub a b) d) (sub (mul a d) (mul b d)) :=
+  fun a b d => match a as x return Eq Nat (mul (sub x b) d) (sub (mul x d) (mul b d)) with
+    | zero => refl Nat zero
+    | succ p => match b as y return
+        Eq Nat (mul (sub (succ p) y) d) (sub (mul (succ p) d) (mul y d)) with
+        | zero => sym0 Nat (sub (mul (succ p) d) zero) (mul (succ p) d)
+            (subZeroRight (mul (succ p) d))
+        | succ q => trans0 Nat (mul (sub p q) d) (sub (mul p d) (mul q d))
+            (sub (add d (mul p d)) (add d (mul q d)))
+            (natSubMulRight p q d)
+            (sym0 Nat (sub (add d (mul p d)) (add d (mul q d)))
+              (sub (mul p d) (mul q d)) (natSubAddBoth d (mul p d) (mul q d)))
+        end
+    end
+
+def natMulSub : (d : Nat) -> (a : Nat) -> (b : Nat) ->
+    Eq Nat (mul d (sub a b)) (sub (mul d a) (mul d b)) :=
+  fun d a b => trans0 Nat (mul d (sub a b)) (mul (sub a b) d)
+      (sub (mul d a) (mul d b)) (mulComm d (sub a b))
+      (trans0 Nat (mul (sub a b) d) (sub (mul a d) (mul b d))
+        (sub (mul d a) (mul d b)) (natSubMulRight a b d)
+        (trans0 Nat (sub (mul a d) (mul b d)) (sub (mul d a) (mul b d))
+          (sub (mul d a) (mul d b))
+          (cong0 Nat Nat (mul a d) (mul d a) (fun z => sub z (mul b d)) (mulComm a d))
+          (cong0 Nat Nat (mul b d) (mul d b) (fun z => sub (mul d a) z) (mulComm b d))))
+
+def natDvdSub : (d : Nat) -> (a : Nat) -> (b : Nat) ->
+    (ha : NatDvd d a) -> (hb : NatDvd d b) -> NatDvd d (sub a b) :=
+  fun d a b ha hb => match ha as w1 return NatDvd d (sub a b) with
+    | dvdWitness k ek => match hb as w2 return NatDvd d (sub a b) with
+        | dvdWitness l el => dvdWitness d (sub a b) (sub k l)
+            (trans0 Nat (mul d (sub k l)) (sub (mul d k) (mul d l)) (sub a b)
+              (natMulSub d k l)
+              (trans0 Nat (sub (mul d k) (mul d l)) (sub a (mul d l)) (sub a b)
+                (cong0 Nat Nat (mul d k) a (fun z => sub z (mul d l)) ek)
+                (cong0 Nat Nat (mul d l) b (fun z => sub a z) el)))
+        end
+    end
+
+def natDvdOfDvdAdd : (d : Nat) -> (a : Nat) -> (b : Nat) ->
+    (ha : NatDvd d a) -> (hab : NatDvd d (add a b)) -> NatDvd d b :=
+  fun d a b ha hab => natDvdTransport d (sub (add a b) a) b
+    (subAddCancelLeft a b) (natDvdSub d (add a b) a hab ha)
+
+def natAddEqZeroLeft : (a : Nat) -> (b : Nat) ->
+    (e : Eq Nat (add a b) zero) -> Eq Nat a zero :=
+  fun a b e =>
+    (match a as x return (ex : Eq Nat (add x b) zero) -> Eq Nat x zero with
+     | zero => fun ex => refl Nat zero
+     | succ p => fun ex =>
+         match zeroNotSucc (add p b) (sym0 Nat (succ (add p b)) zero ex) as w
+             return Eq Nat (succ p) zero with end
+     end) e
+
+def natAddCycle : (a : Nat) -> (b : Nat) -> (x : Nat) -> (y : Nat) ->
+    (hx : Eq Nat (add a x) b) -> (hy : Eq Nat (add b y) a) -> Eq Nat a b :=
+  fun a b x y hx hy => trans0 Nat a (add a zero) b
+    (sym0 Nat (add a zero) a (addZero a))
+    (subst0 Nat x zero (fun z => Eq Nat (add a z) b)
+      (natAddEqZeroLeft x y
+        (addCancelLeft a (add x y) zero
+          (trans0 Nat (add a (add x y)) (add (add a x) y) (add a zero)
+            (sym0 Nat (add (add a x) y) (add a (add x y)) (addAssoc a x y))
+            (trans0 Nat (add (add a x) y) (add b y) (add a zero)
+              (cong0 Nat Nat (add a x) b (fun z => add z y) hx)
+              (trans0 Nat (add b y) a (add a zero) hy
+                (sym0 Nat (add a zero) a (addZero a))))))) hx)
+
+def natMulCycle : (a : Nat) -> (b : Nat) -> (k : Nat) -> (l : Nat) ->
+    (ek : Eq Nat (mul a k) b) -> (el : Eq Nat (mul b l) a) -> Eq Nat a b :=
+  fun a b k l ek el =>
+    (match k as x return (ex : Eq Nat (mul a x) b) -> Eq Nat a b with
+     | zero => fun ex =>
+         trans0 Nat a zero b
+           (trans0 Nat a (mul b l) zero (sym0 Nat (mul b l) a el)
+             (cong0 Nat Nat b zero (fun z => mul z l)
+               (trans0 Nat b (mul a zero) zero (sym0 Nat (mul a zero) b ex)
+                 (mulZeroRight a))))
+           (trans0 Nat zero (mul a zero) b
+             (sym0 Nat (mul a zero) zero (mulZeroRight a)) ex)
+     | succ p => fun ex =>
+         (match l as y return (ey : Eq Nat (mul b y) a) -> Eq Nat a b with
+          | zero => fun ey =>
+              trans0 Nat a zero b
+                (trans0 Nat a (mul b zero) zero (sym0 Nat (mul b zero) a ey)
+                  (mulZeroRight b))
+                (trans0 Nat zero (mul a (succ p)) b
+                  (cong0 Nat Nat zero a (fun z => mul z (succ p))
+                    (trans0 Nat zero (mul b zero) a
+                      (sym0 Nat (mul b zero) zero (mulZeroRight b)) ey)) ex)
+          | succ q => fun ey => natAddCycle a b (mul a p) (mul b q)
+              (trans0 Nat (add a (mul a p)) (mul a (succ p)) b
+                (sym0 Nat (mul a (succ p)) (add a (mul a p)) (mulSuccRight a p)) ex)
+              (trans0 Nat (add b (mul b q)) (mul b (succ q)) a
+                (sym0 Nat (mul b (succ q)) (add b (mul b q)) (mulSuccRight b q)) ey)
+          end) el
+     end) ek
+
+def natDvdAntisymm : (a : Nat) -> (b : Nat) ->
+    (hab : NatDvd a b) -> (hba : NatDvd b a) -> Eq Nat a b :=
+  fun a b hab hba => match hab as w1 return Eq Nat a b with
+    | dvdWitness k ek => match hba as w2 return Eq Nat a b with
+        | dvdWitness l el => natMulCycle a b k l ek el
+        end
+    end
+
+-- Nonzero divisors have unique quotients. Reuse the integer carrier's
+-- cancellation proof by embedding the natural numbers with pos.
+def natMulCancelLeft : (d : Nat) -> (a : Nat) -> (b : Nat) ->
+    (hd : Eq Nat d zero -> Empty) ->
+    (e : Eq Nat (mul d a) (mul d b)) -> Eq Nat a b :=
+  fun d a b hd e => posInj a b
+    (intMulCancelLeft (pos d) (pos a) (pos b)
+      (fun h => hd (posInj d zero h))
+      (cong0 Nat Int (mul d a) (mul d b) pos e))
+
+def natDvdWitnessUnique : (d : Nat) -> (n : Nat) -> (a : Nat) -> (b : Nat) ->
+    (hd : Eq Nat d zero -> Empty) ->
+    (ea : Eq Nat (mul d a) n) -> (eb : Eq Nat (mul d b) n) -> Eq Nat a b :=
+  fun d n a b hd ea eb => natMulCancelLeft d a b hd
+    (trans0 Nat (mul d a) n (mul d b) ea (sym0 Nat (mul d b) n eb))
+
+-- Certified subtractive Euclid. Computational choices carry their own
+-- difference, so computing gcd never inspects an opaque order proof.
+data GcdCompare (0 a : Nat) (0 b : Nat) : Type 0 :=
+  | gcdLess : (k : Nat) -> (e : Eq Nat (add a (succ k)) b) -> GcdCompare a b
+  | gcdSame : (e : Eq Nat a b) -> GcdCompare a b
+  | gcdGreater : (k : Nat) -> (e : Eq Nat (add b (succ k)) a) -> GcdCompare a b
+
+reducible def rec gcdCompare : (a : Nat) -> (b : Nat) -> GcdCompare a b :=
+  fun a b => match a as x return GcdCompare x b with
+    | zero => match b as y return GcdCompare zero y with
+        | zero => gcdSame zero zero (refl Nat zero)
+        | succ q => gcdLess zero (succ q) q (refl Nat (succ q))
+        end
+    | succ p => match b as y return GcdCompare (succ p) y with
+        | zero => gcdGreater (succ p) zero p (refl Nat (succ p))
+        | succ q => match gcdCompare p q as t return GcdCompare (succ p) (succ q) with
+            | gcdLess k e => gcdLess (succ p) (succ q) k
+                (cong0 Nat Nat (add p (succ k)) q succ e)
+            | gcdSame e => gcdSame (succ p) (succ q) (cong0 Nat Nat p q succ e)
+            | gcdGreater k e => gcdGreater (succ p) (succ q) k
+                (cong0 Nat Nat (add q (succ k)) p succ e)
+            end
+        end
+    end
+
+reducible def gcdCompareStep : (a : Nat) -> (b : Nat) ->
+    GcdCompare a b -> (Nat -> Nat -> Nat) -> Nat :=
+  fun a b c next => match c with
+    | gcdLess k e => next a (succ k)
+    | gcdSame e => a
+    | gcdGreater k e => next (succ k) b
+    end
+
+-- The fuel worker is total, so it returns zero when the fuel runs out.
+-- Only gcd is safe to call: it supplies succ (add a b), the bound that
+-- gcdFuelSpec requires. gcdFuel needs that bound from its caller.
+reducible def rec gcdFuel : Nat -> Nat -> Nat -> Nat :=
+  fun fuel a b => match fuel with
+    | zero => zero
+    | succ f => match a with
+        | zero => b
+        | succ p => match b with
+            | zero => succ p
+            | succ q => gcdCompareStep (succ p) (succ q)
+                (gcdCompare (succ p) (succ q)) (gcdFuel f)
+            end
+        end
+    end
+
+reducible def gcd : Nat -> Nat -> Nat :=
+  fun a b => gcdFuel (succ (add a b)) a b
+
+def gcdLtZero : (n : Nat) -> NatLt n zero -> Empty :=
+  fun n h => match h as w return Empty with
+    | ltWitness k e => zeroNotSucc (add n k)
+        (sym0 Nat (succ (add n k)) zero
+          (trans0 Nat (succ (add n k)) (add n (succ k)) zero
+            (sym0 Nat (add n (succ k)) (succ (add n k)) (addSuccRight n k)) e))
+    end
+
+def gcdBoundLeft : (p : Nat) -> (b : Nat) -> (f : Nat) ->
+    NatLt (add (succ p) b) (succ f) -> NatLt b f :=
+  fun p b f h => match h as w return NatLt b f with
+    | ltWitness k e => ltWitness b f (add p k)
+        (trans0 Nat (add b (succ (add p k))) (add b (add p (succ k))) f
+          (cong0 Nat Nat (succ (add p k)) (add p (succ k)) (fun z => add b z)
+            (sym0 Nat (add p (succ k)) (succ (add p k)) (addSuccRight p k)))
+          (trans0 Nat (add b (add p (succ k))) (add (add b p) (succ k)) f
+            (sym0 Nat (add (add b p) (succ k)) (add b (add p (succ k)))
+              (addAssoc b p (succ k)))
+            (trans0 Nat (add (add b p) (succ k)) (add (add p b) (succ k)) f
+              (cong0 Nat Nat (add b p) (add p b) (fun z => add z (succ k)) (addComm b p))
+              (succInj (add (add p b) (succ k)) f e))))
+    end
+
+def gcdBoundRight : (a : Nat) -> (q : Nat) -> (f : Nat) ->
+    NatLt (add a (succ q)) (succ f) -> NatLt a f :=
+  fun a q f h => gcdBoundLeft q a f
+    (subst0 Nat (add a (succ q)) (add (succ q) a)
+      (fun z => NatLt z (succ f)) (addComm a (succ q)) h)
+
+-- The mathematical contract is separate from the computing function.
+-- The fuel bound proves that its exhausted-fuel branch is unreachable.
+data GcdSpec (0 g : Nat) (0 a : Nat) (0 b : Nat) : Type 0 :=
+  | gcdCertified : (left : NatDvd g a) -> (right : NatDvd g b) ->
+      (greatest : (d : Nat) -> NatDvd d a -> NatDvd d b -> NatDvd d g) -> GcdSpec g a b
+
+def gcdSpecSwap : (g : Nat) -> (a : Nat) -> (b : Nat) -> GcdSpec g a b -> GcdSpec g b a :=
+  fun g a b s => match s as t return GcdSpec g b a with
+    | gcdCertified l r greatest => gcdCertified g b a r l (fun d hb ha => greatest d ha hb)
+    end
+
+def gcdSpecTransportRight : (g : Nat) -> (a : Nat) -> (b : Nat) -> (c : Nat) ->
+    Eq Nat b c -> GcdSpec g a b -> GcdSpec g a c :=
+  fun g a b c e s => subst0 Nat b c (fun z => GcdSpec g a z) e s
+
+def gcdSpecZeroLeft : (b : Nat) -> GcdSpec b zero b :=
+  fun b => gcdCertified b zero b (natDvdZero b) (natDvdRefl b) (fun d hz hb => hb)
+
+def gcdSpecDiagonal : (a : Nat) -> GcdSpec a a a :=
+  fun a => gcdCertified a a a (natDvdRefl a) (natDvdRefl a) (fun d ha hb => ha)
+
+def gcdSpecAddRight : (g : Nat) -> (a : Nat) -> (b : Nat) ->
+    GcdSpec g a b -> GcdSpec g a (add a b) :=
+  fun g a b s => match s as t return GcdSpec g a (add a b) with
+    | gcdCertified l r greatest => gcdCertified g a (add a b)
+        l (natDvdAdd g a b l r)
+        (fun d ha hab => greatest d ha (natDvdOfDvdAdd d a b ha hab))
+    end
+
+def gcdStepSpec : (f : Nat) -> (p : Nat) -> (q : Nat) ->
+    (next : Nat -> Nat -> Nat) ->
+    ((a : Nat) -> (b : Nat) -> NatLt (add a b) f -> GcdSpec (next a b) a b) ->
+    NatLt (add (succ p) (succ q)) (succ f) ->
+    (c : GcdCompare (succ p) (succ q)) ->
+    GcdSpec (gcdCompareStep (succ p) (succ q) c next) (succ p) (succ q) :=
+  fun f p q next ih bound c =>
+    match c as t return GcdSpec (gcdCompareStep (succ p) (succ q) t next) (succ p) (succ q) with
+    | gcdLess k e => gcdSpecTransportRight (next (succ p) (succ k)) (succ p)
+        (add (succ p) (succ k)) (succ q) e
+        (gcdSpecAddRight (next (succ p) (succ k)) (succ p) (succ k)
+          (ih (succ p) (succ k)
+            (subst0 Nat (succ q) (add (succ p) (succ k)) (fun z => NatLt z f)
+              (sym0 Nat (add (succ p) (succ k)) (succ q) e)
+              (gcdBoundLeft p (succ q) f bound))))
+    | gcdSame e => gcdSpecTransportRight (succ p) (succ p) (succ p) (succ q) e
+        (gcdSpecDiagonal (succ p))
+    | gcdGreater k e => gcdSpecSwap (next (succ k) (succ q)) (succ q) (succ p)
+        (gcdSpecTransportRight (next (succ k) (succ q)) (succ q)
+          (add (succ q) (succ k)) (succ p) e
+          (gcdSpecAddRight (next (succ k) (succ q)) (succ q) (succ k)
+            (gcdSpecSwap (next (succ k) (succ q)) (succ k) (succ q)
+              (ih (succ k) (succ q)
+                (subst0 Nat (succ p) (add (succ k) (succ q)) (fun z => NatLt z f)
+                  (sym0 Nat (add (succ k) (succ q)) (succ p)
+                    (trans0 Nat (add (succ k) (succ q)) (add (succ q) (succ k)) (succ p)
+                      (addComm (succ k) (succ q)) e))
+                  (gcdBoundRight (succ p) q f bound))))))
+    end
+
+def rec gcdFuelSpec : (fuel : Nat) -> (a : Nat) -> (b : Nat) ->
+    NatLt (add a b) fuel -> GcdSpec (gcdFuel fuel a b) a b :=
+  fun fuel => match fuel as z return (a : Nat) -> (b : Nat) ->
+      NatLt (add a b) z -> GcdSpec (gcdFuel z a b) a b with
+    | zero => fun a b bound =>
+        match gcdLtZero (add a b) bound as impossible return GcdSpec zero a b with end
+    | succ f => fun a b => match a as x return NatLt (add x b) (succ f) ->
+        GcdSpec (gcdFuel (succ f) x b) x b with
+        | zero => fun bound => gcdSpecZeroLeft b
+        | succ p => match b as y return NatLt (add (succ p) y) (succ f) ->
+            GcdSpec (gcdFuel (succ f) (succ p) y) (succ p) y with
+            | zero => fun bound => gcdSpecSwap (succ p) zero (succ p) (gcdSpecZeroLeft (succ p))
+            | succ q => fun bound => gcdStepSpec f p q (gcdFuel f)
+                (gcdFuelSpec f) bound (gcdCompare (succ p) (succ q))
+            end
+        end
+    end
+
+def gcdSpec : (a : Nat) -> (b : Nat) -> GcdSpec (gcd a b) a b :=
+  fun a b => gcdFuelSpec (succ (add a b)) a b
+    (ltWitness (add a b) (succ (add a b)) zero
+      (trans0 Nat (add (add a b) (succ zero)) (succ (add (add a b) zero)) (succ (add a b))
+        (addSuccRight (add a b) zero)
+        (cong0 Nat Nat (add (add a b) zero) (add a b) succ (addZero (add a b)))))
+
+def gcdDvdLeft : (a : Nat) -> (b : Nat) -> NatDvd (gcd a b) a :=
+  fun a b => match gcdSpec a b as s return NatDvd (gcd a b) a with
+    | gcdCertified l r greatest => l
+    end
+
+def gcdDvdRight : (a : Nat) -> (b : Nat) -> NatDvd (gcd a b) b :=
+  fun a b => match gcdSpec a b as s return NatDvd (gcd a b) b with
+    | gcdCertified l r greatest => r
+    end
+
+def gcdGreatest : (a : Nat) -> (b : Nat) -> (d : Nat) ->
+    NatDvd d a -> NatDvd d b -> NatDvd d (gcd a b) :=
+  fun a b d ha hb => match gcdSpec a b as s return NatDvd d (gcd a b) with
+    | gcdCertified l r greatest => greatest d ha hb
+    end
+
+def gcdSpecUnique : (g : Nat) -> (h : Nat) -> (a : Nat) -> (b : Nat) ->
+    GcdSpec g a b -> GcdSpec h a b -> Eq Nat g h :=
+  fun g h a b sg sh => match sg as s return Eq Nat g h with
+    | gcdCertified gl gr greatestG => match sh as t return Eq Nat g h with
+        | gcdCertified hl hr greatestH => natDvdAntisymm g h
+            (greatestH g gl gr) (greatestG h hl hr)
+        end
+    end
+
+def gcdUnique : (a : Nat) -> (b : Nat) -> (g : Nat) ->
+    GcdSpec g a b -> Eq Nat (gcd a b) g :=
+  fun a b g s => gcdSpecUnique (gcd a b) g a b (gcdSpec a b) s
+
+def gcdComm : (a : Nat) -> (b : Nat) -> Eq Nat (gcd a b) (gcd b a) :=
+  fun a b => gcdUnique a b (gcd b a) (gcdSpecSwap (gcd b a) b a (gcdSpec b a))
+
+def gcdZeroLeft : (a : Nat) -> Eq Nat (gcd zero a) a :=
+  fun a => gcdUnique zero a a (gcdSpecZeroLeft a)
+
+def gcdZeroRight : (a : Nat) -> Eq Nat (gcd a zero) a :=
+  fun a => gcdUnique a zero a (gcdSpecSwap a zero a (gcdSpecZeroLeft a))
+
+def gcdSelf : (a : Nat) -> Eq Nat (gcd a a) a :=
+  fun a => gcdUnique a a a (gcdSpecDiagonal a)
+
+def gcdOneRight : (a : Nat) -> Eq Nat (gcd a one) one :=
+  fun a => gcdUnique a one one
+    (gcdCertified one a one (natOneDvd a) (natDvdRefl one) (fun d ha h1 => h1))
+
+def gcdOneLeft : (a : Nat) -> Eq Nat (gcd one a) one :=
+  fun a => trans0 Nat (gcd one a) (gcd a one) one (gcdComm one a) (gcdOneRight a)
+
+def gcdAddRight : (a : Nat) -> (b : Nat) -> Eq Nat (gcd a (add a b)) (gcd a b) :=
+  fun a b => gcdUnique a (add a b) (gcd a b)
+    (gcdSpecAddRight (gcd a b) a b (gcdSpec a b))
+
+def gcdAddLeft : (a : Nat) -> (b : Nat) -> Eq Nat (gcd (add a b) a) (gcd b a) :=
+  fun a b => trans0 Nat (gcd (add a b) a) (gcd a (add a b)) (gcd b a)
+    (gcdComm (add a b) a)
+    (trans0 Nat (gcd a (add a b)) (gcd a b) (gcd b a)
+      (gcdAddRight a b) (gcdComm a b))
+
+def gcdNeZeroLeft : (a : Nat) -> (b : Nat) ->
+    (Eq Nat a zero -> Empty) -> Eq Nat (gcd a b) zero -> Empty :=
+  fun a b ha e => ha (natZeroDvd a
+    (subst0 Nat (gcd a b) zero (fun z => NatDvd z a) e (gcdDvdLeft a b)))
+
+def gcdNeZeroRight : (a : Nat) -> (b : Nat) ->
+    (Eq Nat b zero -> Empty) -> Eq Nat (gcd a b) zero -> Empty :=
+  fun a b hb e => hb (natZeroDvd b
+    (subst0 Nat (gcd a b) zero (fun z => NatDvd z b) e (gcdDvdRight a b)))
+
+def gcdNatPosOfNeZero : (n : Nat) -> (Eq Nat n zero -> Empty) -> NatLt zero n :=
+  fun n => match n as x return (Eq Nat x zero -> Empty) -> NatLt zero x with
+    | zero => fun hn => match hn (refl Nat zero) as impossible return NatLt zero zero with end
+    | succ p => fun hn => ltWitness zero (succ p) p (refl Nat (succ p))
+    end
+
+def gcdPosLeft : (a : Nat) -> (b : Nat) -> NatLt zero a -> NatLt zero (gcd a b) :=
+  fun a b ha => gcdNatPosOfNeZero (gcd a b)
+    (gcdNeZeroLeft a b (fun e => gcdLtZero zero
+      (subst0 Nat a zero (fun z => NatLt zero z) e ha)))
+
+def gcdPosRight : (a : Nat) -> (b : Nat) -> NatLt zero b -> NatLt zero (gcd a b) :=
+  fun a b hb => gcdNatPosOfNeZero (gcd a b)
+    (gcdNeZeroRight a b (fun e => gcdLtZero zero
+      (subst0 Nat b zero (fun z => NatLt zero z) e hb)))
+
+check natDvdTransport
+check natDvdRefl
+check natDvdZero
+check natOneDvd
+check natZeroDvd
+check natDvdTrans
+check natDvdAdd
+check natSubAddBoth
+check natSubMulRight
+check natMulSub
+check natDvdSub
+check natDvdOfDvdAdd
+check natAddEqZeroLeft
+check natAddCycle
+check natMulCycle
+check natDvdAntisymm
+check natMulCancelLeft
+check natDvdWitnessUnique
+check gcdCompare
+check gcdCompareStep
+check gcdFuel
+check gcd
+check gcdLtZero
+check gcdBoundLeft
+check gcdBoundRight
+check gcdSpecSwap
+check gcdSpecTransportRight
+check gcdSpecZeroLeft
+check gcdSpecDiagonal
+check gcdSpecAddRight
+check gcdStepSpec
+check gcdFuelSpec
+check gcdSpec
+check gcdDvdLeft
+check gcdDvdRight
+check gcdGreatest
+check gcdSpecUnique
+check gcdUnique
+check gcdComm
+check gcdZeroLeft
+check gcdZeroRight
+check gcdSelf
+check gcdOneRight
+check gcdOneLeft
+check gcdAddRight
+check gcdAddLeft
+check gcdNeZeroLeft
+check gcdNeZeroRight
+check gcdNatPosOfNeZero
+check gcdPosLeft
+check gcdPosRight

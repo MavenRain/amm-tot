@@ -24,11 +24,11 @@ Run from this directory. The runner uses the checker named by `TOT` when
 that variable is set. Otherwise it uses the pinned checker at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe` and
 stops with a message when that file is absent. The runner concatenates
-the seventeen source files of `src`, in the order in which the Sources line
-at the end of
-this file names them, in temporary files and checks with `--no-prelude --no-axioms`. It prints the checker
-SHA-256, so validation identifies the binary actually used. No compiler
-rebuild is necessary when a built checker exists.
+the eighteen source files of `src`, in the order in which the Sources line
+at the end of this file names them, in temporary files and checks with
+`--no-prelude --no-axioms`. It prints the checker SHA-256, so validation
+identifies the binary actually used. No compiler rebuild is necessary
+when a built checker exists.
 
 ## What is proved
 
@@ -612,6 +612,40 @@ six declarations of `src/Foundation.tot`, `Empty`, `Eq`, `subst0`,
 computing defs `add`, `mul` and `one`. It cites nothing else of the
 sixteen frozen files.
 
+## Divisibility and gcd
+
+`src/Gcd.tot` is M4c, the third slice of the concrete carrier. `NatDvd d n`
+holds a natural quotient `k` and the equation `mul d k = n`. Divisibility
+is therefore constructive, including at zero. Its laws establish
+reflexivity, transitivity, addition, cancellation of a divisible summand
+and antisymmetry.
+
+`gcd a b` computes the greatest common divisor using subtractive Euclid.
+The worker recurses on structural fuel, with `succ (add a b)` supplied by
+the public function. Each nonterminal step reduces the sum of the two
+inputs. Computation and certification are separate: the reducible worker
+returns a natural number, and its proof establishes that sufficient fuel
+produces a divisor of both inputs that every common divisor divides.
+The raw worker returns zero on exhaustion; `gcdFuelSpec` requires the
+strict bound `NatLt (add a b) fuel`, and `gcdSpec` supplies that bound
+for every call of `gcd`.
+The computing comparison is also reducible, so closed inputs evaluate
+without unfolding opaque theorem bodies.
+
+The universal property gives uniqueness, symmetry and the zero, equal
+input and unit laws. In particular, `gcd zero zero` is zero, and a nonzero
+input gives a nonzero gcd. These facts prepare normalization by a common
+factor. Exact division, coprimality of the reduced components and equality
+of canonical fractions belong to M4d.
+
+This slice adds no axioms and changes none of the seventeen existing
+source files. The natural-number computations and their proofs are closed
+terms. They do not require an inhabitant of `OrderedField`.
+The file holds three data types, `NatDvd`, `GcdCompare` and `GcdSpec`,
+four computing definitions and 47 proofs. `natDvdWitnessUnique` proves
+that a nonzero divisor has a unique quotient, using `natMulCancelLeft`
+and the integer multiplication cancellation theorem through `pos`.
+
 ## Measurement
 
 | Quantity | Lean | tot, pilot | tot, record |
@@ -798,13 +832,14 @@ are one in each of `addLiquidityPreservesRatio`, `lpShareCross`,
 context. The five `subst0` are two in `addLiquidityPreservesRatio`, two
 in `lpShareCross` and one in `addRemoveRoundtripX`.
 
-The one file of M4a and the one file of M4b, in proof-term occurrences.
+The files of M4a, M4b and M4c, in proof-term occurrences.
 Comment lines are excluded from the counts, as in the tables above.
 
 | file | Lean | lines | `trans0` | `cong0` | `sym0` | `subst0` |
 | --- | --- | --- | --- | --- | --- | --- |
 | `src/Nat.tot` | Lean core and Mathlib | 299 | 20 | 23 | 12 | 1 |
 | src/Int.tot | Lean core | 1081 | 81 | 61 | 55 | 16 |
+| `src/Gcd.tot` | Lean core counterparts | 468 | 34 | 17 | 22 | 10 |
 
 The file is 318 lines with its nineteen-line header comment, and 299
 lines without it. The Lean column names the library that supplies the
@@ -832,6 +867,11 @@ the steps of the ring laws, the order laws and the six cores, which
 chain equations by hand for the same reason. The file is 3.6 times
 `src/Nat.tot`, because every law of the integers is a law of the
 naturals on two components at once.
+
+`src/Gcd.tot` has 483 lines, or 468 after excluding comment lines,
+with 51 definitions and 51 trailing `check` commands. The four reducible
+definitions compute comparison, one Euclid step, the fuel worker and
+the public gcd. Every other definition is a proof.
 
 The Lean source of each def of `src/Nat.tot`, in file order.
 
@@ -958,8 +998,68 @@ laws in Lean core, with specializations, equality reversal and
 commutativity noted where the interfaces differ. These references were
 checked against the Lean v4.30.0-rc1 sources used by `amm-lean`.
 
-`test/check.py` runs in about 16 seconds of wall time on the pinned
-checker, for all 142 cases.
+The counterparts or local roles of all 51 definitions in `src/Gcd.tot`:
+
+| def | Lean core counterpart or local role |
+| --- | --- |
+| `natDvdTransport` | local equality transport |
+| `natDvdRefl` | `Nat.dvd_refl` |
+| `natDvdZero` | `Nat.dvd_zero` |
+| `natOneDvd` | `Nat.one_dvd` |
+| `natZeroDvd` | `Nat.eq_zero_of_zero_dvd` |
+| `natDvdTrans` | `Nat.dvd_trans` |
+| `natDvdAdd` | `Nat.dvd_add` |
+| `natSubAddBoth` | `Nat.add_sub_add_left` |
+| `natSubMulRight` | `Nat.mul_sub_right_distrib` |
+| `natMulSub` | `Nat.mul_sub_left_distrib` |
+| `natDvdSub` | `Nat.dvd_sub` |
+| `natDvdOfDvdAdd` | `Nat.dvd_add_iff_right`, reverse direction |
+| `natAddEqZeroLeft` | `Nat.eq_zero_of_add_eq_zero_right` |
+| `natAddCycle` | local addition-cycle helper |
+| `natMulCycle` | local multiplication-cycle helper |
+| `natDvdAntisymm` | `Nat.dvd_antisymm` |
+| `natMulCancelLeft` | `Nat.eq_of_mul_eq_mul_left`, with nonzero in place of positivity |
+| `natDvdWitnessUnique` | local quotient uniqueness wrapper |
+| `gcdCompare` | local comparison with a difference witness |
+| `gcdCompareStep` | local subtractive Euclid step |
+| `gcdFuel` | local structural fuel worker |
+| `gcd` | `Nat.gcd`, with a different algorithm |
+| `gcdLtZero` | local impossibility of being below zero |
+| `gcdBoundLeft` | local decreasing-sum bound |
+| `gcdBoundRight` | local decreasing-sum bound |
+| `gcdSpecSwap` | local certificate symmetry |
+| `gcdSpecTransportRight` | local certificate transport |
+| `gcdSpecZeroLeft` | local zero certificate |
+| `gcdSpecDiagonal` | local equal-input certificate |
+| `gcdSpecAddRight` | local addition step on certificates |
+| `gcdStepSpec` | local correctness of a comparison step |
+| `gcdFuelSpec` | local correctness under a fuel bound |
+| `gcdSpec` | `Nat.gcd_eq_iff`, constructive universal specification |
+| `gcdDvdLeft` | `Nat.gcd_dvd_left` |
+| `gcdDvdRight` | `Nat.gcd_dvd_right` |
+| `gcdGreatest` | `Nat.dvd_gcd` |
+| `gcdSpecUnique` | local uniqueness from divisibility antisymmetry |
+| `gcdUnique` | `Nat.gcd_eq_iff`, certificate-to-equality direction |
+| `gcdComm` | `Nat.gcd_comm` |
+| `gcdZeroLeft` | `Nat.gcd_zero_left` |
+| `gcdZeroRight` | `Nat.gcd_zero_right` |
+| `gcdSelf` | `Nat.gcd_self` |
+| `gcdOneRight` | `Nat.gcd_one_right` |
+| `gcdOneLeft` | `Nat.gcd_one_left` |
+| `gcdAddRight` | `Nat.gcd_self_add_right` |
+| `gcdAddLeft` | `Nat.gcd_self_add_left` |
+| `gcdNeZeroLeft` | `Nat.gcd_ne_zero_left` |
+| `gcdNeZeroRight` | `Nat.gcd_ne_zero_right` |
+| `gcdNatPosOfNeZero` | local conversion from nonzero to positive |
+| `gcdPosLeft` | `Nat.gcd_pos_of_pos_left` |
+| `gcdPosRight` | `Nat.gcd_pos_of_pos_right` |
+
+These names were checked in Lean v4.30.0-rc1's
+`Init/Data/Nat/Basic.lean`, `Lemmas.lean`, `Dvd.lean` and `Gcd.lean`.
+They identify mathematical counterparts. Lean's `Nat.gcd` uses modulus
+Euclid, while this file uses subtraction and an explicit fuel proof.
+
+`test/check.py` checks all 181 cases against the pinned checker.
 
 ## Scope and trust
 
@@ -992,7 +1092,7 @@ three fields that the record gained.
 
 ## Validation
 
-On 2026-09-06, all 142 checks passed with checker SHA-256
+On 2026-09-06, all 181 checks passed with checker SHA-256
 `30c4524d57f6723e39ba117097222f3ab8ef3e899a8a4af8b7e60c68337842bf` at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe`,
 built from tot commit `8cf0b8b` with a clean tree. Build that commit to
@@ -1001,7 +1101,7 @@ reproduce the reference checker.
 The checker reports every rejection in this repository with the word
 `mismatch`, except the axiom case, which reports `axiom`.
 
-The 142 checks:
+The 181 checks:
 
 - The theorem checks without a prelude or axioms.
 - The proof is rejected against a commuted right side, `fmul y x`.
@@ -1158,6 +1258,20 @@ The 142 checks:
   four order field signatures of `OrderedField`, specialized to `Int`.
   This checks that the hypothesis quantities match the interface as
   well as the propositions.
+- Two positive M4c cases check 89 closed gcd values against Python's
+  `math.gcd`, and constructive divisibility examples including truncated
+  subtraction, cancellation of a summand, zero and quotient uniqueness.
+  Every value check uses `refl`, so it requires actual evaluation by
+  conversion. Three negative examples reject an incorrect gcd value,
+  an incorrect zero-input value and a false divisibility witness.
+- Thirty four M4c header mutations preserve the proof and require the
+  first rejection at the named definition. They cover the divisibility
+  interface, the gcd certificate, the Euclid step, the certificate
+  helper for addition, every public gcd law and quotient uniqueness.
+  One weakens the worker's fuel premise from `NatLt (add a b) fuel` to
+  `NatLt a fuel`; the unchanged proof is rejected at `gcdFuelSpec`. The
+  header mutation helper restricts each replacement to its named
+  definition even though all checks stand at the end of `src/Gcd.tot`.
 - Twenty five checks, one for each theorem of `src/Int.tot` that M4b
   adds. Each check changes the result type of the theorem and keeps the
   proof, so each one is rejected at its own def:
@@ -1186,15 +1300,12 @@ The 142 checks:
   their own, because a mutation of any of them is caught by the theorem
   that cites it.
 
-For the 110 checks that M3a, M3b, M3c, M3d, M4a and M4b add, the
-runner also
-reads
-the position
-of the diagnostic and confirms the name of the first failing def. A
-mutation that moves the rejection to another def fails the case. Each
-mutation helper asserts the exact number of occurrences of its anchor,
-so a rename in a source file stops the runner instead of weakening a
-case.
+For the 147 checks that M3a, M3b, M3c, M3d, M4a, M4b and M4c add, the
+runner also reads the position of the diagnostic and confirms the name
+of the first failing def. A mutation that moves the rejection to
+another def fails the case. Each mutation helper asserts the exact
+number of occurrences of its anchor, so a rename in a source file
+stops the runner instead of weakening a case.
 
 The negative controls show that specific proof terms are rejected. They
 do not show that the false statements are unprovable.
@@ -1348,16 +1459,17 @@ instance. Every ordered field is infinite, so the carrier is the
 rationals, and M4 is cut into five slices.
 
 1. M4a, the natural numbers, `src/Nat.tot`. Done.
-2. M4b, the integers, `src/Int.tot`. Done, this commit.
+2. M4b, the integers, `src/Int.tot`. Done.
 3. M4c, divisibility and the greatest common divisor, `src/Gcd.tot`.
+   Done, this commit.
 4. M4d, the reduced fractions and the field laws, `src/Rat.tot`.
 5. M4e, the order, the `OrderedField` inhabitant and the closed
    instance, `src/RatOrder.tot` and `src/Instance.tot`.
 
-Sources, nineteen files: `src/Foundation.tot`, `src/Field.tot`,
+Sources, twenty files: `src/Foundation.tot`, `src/Field.tot`,
 `src/Invariant.tot`, `src/Axioms.tot`, `src/Ring.tot`, `src/Laws.tot`,
 `src/Compose.tot`, `src/Frac.tot`, `src/Order.tot`, `src/Pool.tot`,
 `src/Basic.tot`, `src/Product.tot`, `src/NoDrain.tot`,
 `src/PriceImpact.tot`, `src/Liquidity.tot`, `src/Nat.tot`,
-`src/Int.tot`, `test/check.py`, `README.md`. The first seventeen are the
-check order.
+`src/Int.tot`, `src/Gcd.tot`, `test/check.py`, `README.md`. The first
+eighteen are the check order.

@@ -1,5 +1,6 @@
 """Check the swap identity, the order and fraction library, and the rejection controls."""
 from functools import reduce
+from math import gcd as expected_gcd
 from pathlib import Path
 import hashlib
 import os
@@ -13,7 +14,7 @@ DEFAULT_TOT = Path("/Users/oobi/Documents/kan-lang-tot-pin/"
 TOT = Path(os.environ.get("TOT", DEFAULT_TOT))
 NAMES = ["Foundation", "Field", "Invariant", "Axioms", "Ring", "Laws",
          "Compose", "Frac", "Order", "Pool", "Basic", "Product", "NoDrain",
-         "PriceImpact", "Liquidity", "Nat", "Int"]
+         "PriceImpact", "Liquidity", "Nat", "Int", "Gcd"]
 FILES = {name: (ROOT / "src" / f"{name}.tot").read_text() for name in NAMES}
 FIELD = FILES["Field"]
 INVARIANT = FILES["Invariant"]
@@ -24,7 +25,7 @@ ORDER = FILES["Order"]
 POOL = FILES["Pool"]
 
 def concatenate(**changed):
-    """Return the fifteen sources in check order, with the named ones replaced."""
+    """Return the sources in check order, with the named ones replaced."""
     return "\n".join(changed.get(name, FILES[name]) for name in NAMES)
 
 BASE = concatenate()
@@ -773,6 +774,56 @@ INT_NEGATIVES = [
      "def intDecEq : (x : Int) -> (y : Int) -> Dec (Eq Int y x) :="),
 ]
 
+# These controls alter a result or premise in the named Gcd.tot header.
+# Proofs stay intact, and rejection must occur at that same definition.
+GCD_NEGATIVES = [
+    ("wrong-gcd-dvd-transport", "natDvdTransport", "NatDvd d b :=", "NatDvd b d :="),
+    ("wrong-gcd-dvd-refl", "natDvdRefl", "NatDvd d d :=", "NatDvd zero d :="),
+    ("wrong-gcd-dvd-zero", "natDvdZero", "NatDvd d zero :=", "NatDvd zero d :="),
+    ("wrong-gcd-one-dvd", "natOneDvd", "NatDvd one n :=", "NatDvd n one :="),
+    ("wrong-gcd-zero-dvd", "natZeroDvd", "Eq Nat n zero :=", "Eq Nat n one :="),
+    ("wrong-gcd-dvd-trans", "natDvdTrans", "NatDvd a c :=", "NatDvd c a :="),
+    ("wrong-gcd-dvd-add", "natDvdAdd", "NatDvd d (add a b) :=", "NatDvd (add a b) d :="),
+    ("wrong-gcd-dvd-sub", "natDvdSub", "NatDvd d (sub a b) :=", "NatDvd (sub a b) d :="),
+    ("wrong-gcd-dvd-cancel-summand", "natDvdOfDvdAdd", "NatDvd d b :=", "NatDvd b d :="),
+    ("wrong-gcd-dvd-antisymm", "natDvdAntisymm", "Eq Nat a b :=", "Eq Nat a zero :="),
+    ("wrong-gcd-mul-cancel", "natMulCancelLeft", "Eq Nat a b :=", "Eq Nat a zero :="),
+    ("wrong-gcd-quotient-unique", "natDvdWitnessUnique", "Eq Nat a b :=", "Eq Nat a zero :="),
+    ("wrong-gcd-fuel-spec", "gcdFuelSpec", "GcdSpec (gcdFuel fuel a b) a b :=", "GcdSpec zero a b :="),
+    ("wrong-gcd-fuel-bound", "gcdFuelSpec", "NatLt (add a b) fuel ->", "NatLt a fuel ->"),
+    ("wrong-gcd-spec", "gcdSpec", "GcdSpec (gcd a b) a b :=", "GcdSpec zero a b :="),
+    ("wrong-gcd-dvd-left", "gcdDvdLeft", "NatDvd (gcd a b) a :=", "NatDvd a (gcd a b) :="),
+    ("wrong-gcd-dvd-right", "gcdDvdRight", "NatDvd (gcd a b) b :=", "NatDvd b (gcd a b) :="),
+    ("wrong-gcd-greatest", "gcdGreatest", "NatDvd d (gcd a b) :=", "NatDvd (gcd a b) d :="),
+    ("wrong-gcd-spec-unique", "gcdSpecUnique", "Eq Nat g h :=", "Eq Nat g zero :="),
+    ("wrong-gcd-unique", "gcdUnique", "Eq Nat (gcd a b) g :=", "Eq Nat (gcd a b) zero :="),
+    ("wrong-gcd-comm", "gcdComm", "Eq Nat (gcd a b) (gcd b a) :=", "Eq Nat (gcd a b) (add b a) :="),
+    ("wrong-gcd-zero-left", "gcdZeroLeft", "Eq Nat (gcd zero a) a :=", "Eq Nat (gcd zero a) zero :="),
+    ("wrong-gcd-zero-right", "gcdZeroRight", "Eq Nat (gcd a zero) a :=", "Eq Nat (gcd a zero) zero :="),
+    ("wrong-gcd-self", "gcdSelf", "Eq Nat (gcd a a) a :=", "Eq Nat (gcd a a) one :="),
+    ("wrong-gcd-one-right", "gcdOneRight", "Eq Nat (gcd a one) one :=", "Eq Nat (gcd a one) a :="),
+    ("wrong-gcd-one-left", "gcdOneLeft", "Eq Nat (gcd one a) one :=", "Eq Nat (gcd one a) a :="),
+    ("wrong-gcd-add-right", "gcdAddRight", "Eq Nat (gcd a (add a b)) (gcd a b) :=", "Eq Nat (gcd a (add a b)) (add a b) :="),
+    ("wrong-gcd-add-left", "gcdAddLeft", "Eq Nat (gcd (add a b) a) (gcd b a) :=", "Eq Nat (gcd (add a b) a) (add a b) :="),
+    ("wrong-gcd-nonzero-left", "gcdNeZeroLeft", "Eq Nat (gcd a b) zero -> Empty :=", "Eq Nat (gcd a b) one -> Empty :="),
+    ("wrong-gcd-nonzero-right", "gcdNeZeroRight", "Eq Nat (gcd a b) zero -> Empty :=", "Eq Nat (gcd a b) one -> Empty :="),
+    ("wrong-gcd-pos-left", "gcdPosLeft", "NatLt zero (gcd a b) :=", "NatLt (gcd a b) zero :="),
+    ("wrong-gcd-pos-right", "gcdPosRight", "NatLt zero (gcd a b) :=", "NatLt (gcd a b) zero :="),
+    ("wrong-gcd-spec-add-right", "gcdSpecAddRight", "GcdSpec g a b -> GcdSpec g a (add a b) :=", "GcdSpec g a b -> GcdSpec g a (add b a) :="),
+    ("wrong-gcd-step-spec", "gcdStepSpec", "GcdSpec (gcdCompareStep (succ p) (succ q) c next) (succ p) (succ q) :=", "GcdSpec (gcdCompareStep (succ p) (succ q) c next) (succ q) (succ p) :="),
+]
+
+def mutate_gcd_header(def_name, old, new):
+    """Restrict a mutation to one header, including when checks end the file."""
+    source = FILES["Gcd"]
+    start, _end = def_span(def_name, source, "Gcd.tot")
+    header = source[start:source.index(":=", start) + 2]
+    if old == new:
+        raise SystemExit(f"header mutation is the identity in Gcd.tot def {def_name}: {old!r}")
+    if header.count(old) != 1:
+        raise SystemExit(f"header anchor must occur once in Gcd.tot def {def_name}: {old!r}")
+    return mutate_in_def("Gcd", def_name, header, header.replace(old, new))
+
 # These are the four order fields of OrderedField that accept erased
 # hypotheses, specialized to Int. Checking the aliases detects quantity
 # mismatches even when the theorem bodies and rejection controls pass.
@@ -791,12 +842,68 @@ def intOrderMulShape : (a : Int) -> (b : Int) ->
   intMulPos
 """
 
+def nat_term(value):
+    """Encode a nonnegative test numeral using the standalone Nat constructors."""
+    return "(succ " * value + "zero" + ")" * value
+
+def gcd_value_claim(name, left, right, expected):
+    """Require gcd to reduce to the expected numeral by conversion alone."""
+    a, b, result = map(nat_term, (left, right, expected))
+    return (f"\ndef {name} : Eq Nat (gcd {a} {b}) {result} :=\n"
+            f"  refl Nat {result}\ncheck {name}\n")
+
+# Python's independent arithmetic supplies expected values. The square
+# covers both zero arms, equality, both comparison arms, coprimality and
+# shared factors. Larger examples exercise multiple subtraction steps.
+GCD_INPUTS = ([(a, b) for a in range(9) for b in range(9)]
+              + [(12, 18), (18, 12), (21, 14), (14, 21),
+                 (17, 13), (13, 17), (24, 16), (16, 24)])
+GCD_VALUES = "".join(
+    gcd_value_claim(f"gcdValue{a}x{b}", a, b, expected_gcd(a, b))
+    for a, b in GCD_INPUTS)
+
+GCD_DIVISIBILITY = """
+reducible def probeTwo : Nat := succ one
+reducible def probeThree : Nat := succ probeTwo
+reducible def probeFour : Nat := succ probeThree
+reducible def probeSix : Nat := add probeTwo probeFour
+def probeTwoDvdSix : NatDvd probeTwo probeSix :=
+  dvdWitness probeTwo probeSix probeThree (refl Nat probeSix)
+def probeSubDivisible : NatDvd probeTwo probeFour :=
+  natDvdSub probeTwo probeSix probeTwo probeTwoDvdSix (natDvdRefl probeTwo)
+def probeTruncatedSubDivisible : NatDvd probeTwo zero :=
+  natDvdSub probeTwo probeTwo probeSix (natDvdRefl probeTwo) probeTwoDvdSix
+def probeDvdCancelSummand : NatDvd probeTwo probeFour :=
+  natDvdOfDvdAdd probeTwo probeTwo probeFour (natDvdRefl probeTwo) probeTwoDvdSix
+def probeZeroDvdZero : NatDvd zero zero :=
+  dvdWitness zero zero probeThree (refl Nat zero)
+def probeZeroAntisymm : Eq Nat zero zero :=
+  natDvdAntisymm zero zero probeZeroDvdZero (natDvdZero zero)
+def probeQuotientUnique : Eq Nat probeThree probeThree :=
+  natDvdWitnessUnique probeTwo probeSix probeThree probeThree
+    (fun e => zeroNotSucc one (sym0 Nat probeTwo zero e))
+    (refl Nat probeSix) (refl Nat probeSix)
+check probeTwoDvdSix
+check probeSubDivisible
+check probeTruncatedSubDivisible
+check probeDvdCancelSummand
+check probeZeroDvdZero
+check probeZeroAntisymm
+check probeQuotientUnique
+"""
+
 # A case is (name, full source, expected diagnostic word).
 # None: the checker must accept. A string: the checker must exit with
 # status 1 and print that string in its diagnostic.
 CASES = [
     ("swap-output-identity", BASE, None),
     ("int-ordered-field-shapes", BASE + INT_ORDER_SHAPES, None),
+    ("gcd-computation-grid", BASE + GCD_VALUES, None),
+    ("gcd-divisibility-examples", BASE + GCD_DIVISIBILITY, None),
+    ("wrong-gcd-value", BASE + gcd_value_claim("wrongGcdValue", 6, 4, 1), "mismatch"),
+    ("wrong-gcd-zero-value", BASE + gcd_value_claim("wrongGcdZeroValue", 0, 5, 0), "mismatch"),
+    ("wrong-gcd-divisibility", BASE + "\ndef wrongGcdDvd : NatDvd (succ one) (succ (succ one)) :=\n"
+     "  dvdWitness (succ one) (succ (succ one)) one (refl Nat (succ (succ one)))\n", "mismatch"),
     ("commuted-rhs", mutate_invariant(GOAL, COMMUTED), "mismatch"),
     ("wrong-denominator", mutate_invariant(GOAL, WRONG_DEN), "mismatch"),
     ("dropped-step", mutate_invariant(LAST_STEP, NO_LAST_STEP), "mismatch"),
@@ -862,12 +969,17 @@ CASES = [
     for name, def_name, old, new in NAT_NEGATIVES] + [
     # The twenty five result-type negatives of src/Int.tot that M4b adds.
     (name, mutate_in_def("Int", def_name, old, new), "mismatch")
-    for name, def_name, old, new in INT_NEGATIVES]
+    for name, def_name, old, new in INT_NEGATIVES] + [
+    (name, mutate_gcd_header(def_name, old, new), "mismatch")
+    for name, def_name, old, new in GCD_NEGATIVES]
 
 # The def that must fail first, for every case that M3a adds. The name
 # comes from the position of the diagnostic, so a mutation that moves the
 # rejection to another def is a failure of the case.
 FAILING_DEFS = {
+    "wrong-gcd-value": "wrongGcdValue",
+    "wrong-gcd-zero-value": "wrongGcdZeroValue",
+    "wrong-gcd-divisibility": "wrongGcdDvd",
     "weak-axiom-mulpos": "zeroLtOne",
     "weak-axiom-lttrichotomy": "ltOfLtOfLe",
     "weak-axiom-zeroneone": "zeroLtOne",
@@ -887,6 +999,8 @@ FAILING_DEFS = {
        for name, def_name, _old, _new in NAT_NEGATIVES},
     **{name: def_name
        for name, def_name, _old, _new in INT_NEGATIVES},
+    **{name: def_name
+       for name, def_name, _old, _new in GCD_NEGATIVES},
 }
 
 def failing_def(source, result):
