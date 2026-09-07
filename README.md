@@ -12,7 +12,10 @@ The port also states the AMM itself: the two data records of
 also proves the four remaining theorems of `AmmLean/Invariant.lean`, the
 six theorems of `AmmLean/NoDrain.lean`, the five theorems of
 `AmmLean/PriceImpact.lean` and the seven theorems of
-`AmmLean/Liquidity.lean`. Every theorem of amm-lean is ported.
+`AmmLean/Liquidity.lean`. Every theorem of amm-lean is ported. The
+concrete carrier now supplies canonical rational arithmetic and closed
+proofs of its eleven field equations. Rational order and the closed
+ordered-field instance are the remaining carrier work.
 
 ## Check
 
@@ -24,11 +27,17 @@ Run from this directory. The runner uses the checker named by `TOT` when
 that variable is set. Otherwise it uses the pinned checker at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe` and
 stops with a message when that file is absent. The runner concatenates
-the twenty-two source files of `src`, in the order in which the Sources
+the twenty-six source files of `src`, in the order in which the Sources
 line at the end of this file names them, in temporary files and checks
 with `--no-prelude --no-axioms`. It prints the checker SHA-256, so
 validation identifies the binary actually used. No compiler rebuild is
 necessary when a built checker exists.
+
+Most cases check all twenty-six files. M4d2 arithmetic oracle cases and
+their false-value controls check the first twenty-five files, ending at
+`src/RatOps.tot`, whose computing operations they exercise. The full
+source acceptance case, theorem and guard mutations, field interfaces
+and operation-opacity controls also check `src/RatField.tot`.
 
 ## What is proved
 
@@ -649,8 +658,8 @@ and the integer multiplication cancellation theorem through `pos`.
 
 M4d1 adds `src/Div.tot`, `src/Reduce.tot`, `src/Rat.tot` and
 `src/RatNormalize.tot`. This slice constructs reduced fractions and
-proves normalization correct. Rational arithmetic operations and their
-field laws remain M4d2; rational order and the closed `OrderedField`
+proves normalization correct. M4d2 adds rational arithmetic and its
+field equations below; rational order and the closed `OrderedField`
 instance remain M4e.
 
 `natDiv n d` computes natural division by repeated subtraction with
@@ -695,6 +704,68 @@ existing `Rat` returns that same value. This gives
 This slice adds no axioms and changes none of the eighteen existing
 source files. The four files hold one data type, `Rat`, seventeen
 computing definitions and 47 proofs.
+
+## Rational arithmetic and field equations
+
+M4d2 adds `src/Coprime.tot`, `src/RatEq.tot`, `src/RatOps.tot` and
+`src/RatField.tot`. The arithmetic computes on the canonical `Rat`
+representation, and its laws are closed `Eq Rat` proofs built from the
+natural and integer libraries.
+
+`natCoprimeDvdMul` in `src/Coprime.tot` cancels a factor coprime to a
+divisor. `natCoprimeCrossDen` applies that cancellation in both
+directions: if `gcd a b = gcd c d = one` and `a*d = c*b`, then `b = d`.
+The proof follows the existing subtractive Euclid worker
+to establish divisibility after multiplying both inputs by a common
+factor. It adds no factorization assumption.
+
+`ratCrossEq` in `src/RatEq.tot` converts an integer cross-product
+equation into equality of canonical rationals. Taking absolute values
+gives the natural cross-product equation, coprime cancellation identifies
+the denominators, and cancellation of their positive integer embedding
+identifies the numerators. `ratExt` then handles the erased certificates.
+
+The reducible predicate `ratRep r n d` abbreviates
+`ratNum r * d = n * ratDen r`, with natural denominators embedded into
+`Int`. `ratRepNormalize` proves that normalization represents its input.
+`ratRepEq` identifies two representations with the same numerator and
+nonzero denominator. `ratRepTrans` transports a representation across a
+cross-product equation, and `ratRepCrossEq` compares representations with
+different nonzero denominators. These nonzero hypotheses are essential:
+the pair `(0, 0)` alone cannot distinguish rational values.
+
+The six reducible operations in `src/RatOps.tot` use these formulas for
+`a = n/d` and `b = m/e`:
+
+| operation | formula |
+| --- | --- |
+| `ratAdd a b` | `(n*e + m*d)/(d*e)` |
+| `ratMul a b` | `(n*m)/(d*e)` |
+| `ratNeg a` | `(-n)/d` |
+| `ratSub a b` | `a + (-b)` |
+| `ratInv a` | `d/n`, with the sign moved to the numerator |
+| `ratDiv a b` | `a * ratInv b` |
+
+The reciprocal is total, with `ratInv ratZero = ratZero`, so division
+by zero computes to zero as well. Its sign split preserves a positive
+denominator and reads no proof certificate. `ratAddValue`, `ratMulValue`
+and `ratNegValue` prove the raw fraction formulas using `ratRep`;
+`ratInvCross` proves the reciprocal cross-product formula for nonzero
+inputs. `ratAddRep` and `ratMulRep` in `src/RatField.tot` extend the value
+proofs to any supplied representations of their inputs, which lets
+nested arithmetic laws avoid unfolding the gcd computation. `ratRepCast`
+transports equal components, and `ratRepScale` multiplies both components
+by a common natural factor.
+
+Together `src/RatOps.tot` and `src/RatField.tot` prove the eleven
+equational fields of `OrderedField` specialized to `Rat`: addition
+commutativity, associativity, zero and additive inverse; multiplication
+commutativity, associativity, one and distributivity; subtraction as
+addition of a negative; division as multiplication by an inverse; and
+nonzero inverse cancellation. The last theorem has the erased interface
+`(a : Rat) -> (0 ha : (0 e : Eq Rat a ratZero) -> Empty) ->
+Eq Rat (ratMul a (ratInv a)) ratOne`, matching the record's quantities.
+The order fields and construction of the record remain M4e.
 
 ## Measurement
 
@@ -905,6 +976,22 @@ The roles below describe the local implementation.
 
 These four files contain 64 definitions and 64 trailing `check`
 commands. `src/Rat.tot` also uses `J0` once for path induction.
+
+M4d2 uses the same recipe for its four files:
+
+| file | role | lines | `trans0` | `cong0` | `sym0` | `subst0` |
+| --- | --- | --- | --- | --- | --- | --- |
+| `src/Coprime.tot` | coprime factor cancellation | 78 | 2 | 2 | 2 | 0 |
+| `src/RatEq.tot` | cross-product equality and representations | 142 | 14 | 7 | 7 | 0 |
+| `src/RatOps.tot` | computing arithmetic and value proofs | 171 | 7 | 4 | 2 | 0 |
+| `src/RatField.tot` | representation transport and field equations | 676 | 72 | 67 | 24 | 2 |
+| total | | 1067 | 95 | 80 | 35 | 2 |
+
+These files add 64 definitions and 64 trailing `check` commands. The
+eleven public field equations are proved through integer equality
+chains, common-denominator representations and canonical extensionality.
+The two `subst0` applications transport a representation across explicit
+numerator and denominator equalities in `ratRepCast`.
 
 `src/Nat.tot` is 318 lines with its nineteen-line header comment, and 299
 lines without it. The Lean column names the library that supplies the
@@ -1124,7 +1211,8 @@ These names were checked in Lean v4.30.0-rc1's
 They identify mathematical counterparts. Lean's `Nat.gcd` uses modulus
 Euclid, while this file uses subtraction and an explicit fuel proof.
 
-`test/check.py` passes all 244 cases against the pinned checker.
+All 373 cases in the consolidated checkout passed against the pinned
+checker across the validation runs described below.
 
 ## Scope and trust
 
@@ -1137,10 +1225,11 @@ file declares an axiom, and `--no-axioms` rejects any axiom. A caller of
 and one record. Both theorems are conditional on them.
 
 M4d1 supplies a concrete `Rat` type, its integer embedding and a proved
-normalizer, using closed natural and integer arithmetic proofs. It
-does not yet supply rational field operations, their laws, rational
-order or an inhabitant of `OrderedField Rat`. Those are the remaining
-carrier milestones.
+normalizer. M4d2 adds six computing arithmetic operations and proves
+their eleven field equations, using closed natural and integer proofs.
+These are checked equality terms with no new axioms. Rational order
+and an inhabitant of `OrderedField Rat` remain M4e, so the AMM theorems
+still take their field record as a hypothesis.
 
 The standalone foundation declares only `Empty` and indexed
 propositional `Eq`, with `subst0`, `J0`, `sym0`, `trans0` and `cong0`.
@@ -1161,22 +1250,59 @@ three fields that the record gained.
 
 ## Validation
 
-On 2026-09-06, all 244 checks passed with checker SHA-256
+On 2026-09-07, all 373 cases in the consolidated checkout passed with
+checker SHA-256
 `30c4524d57f6723e39ba117097222f3ab8ef3e899a8a4af8b7e60c68337842bf` at
 `/Users/oobi/Documents/kan-lang-tot-pin/_build/default/bin/tot.exe`,
 built from tot commit `8cf0b8b` with a clean tree. Build that commit to
 reproduce the reference checker.
 
+Validation reused 368 earlier passing results after matching the
+checker, expected results, expected first failing definitions and case
+sources with only three identified `src/Div.tot` comment lines omitted
+for comparison. Five fresh checks covered the complete source baseline,
+the three stronger rational extensionality rejection controls and the
+expanded erased-proof interface case. A separate probe confirmed that
+the mutation helper rejects an identity replacement. The validation
+manifest covers all current cases across runs, with the 60-second
+per-case limit unchanged.
+
 The checker reports every rejection in this repository with the word
 `mismatch`, except the axiom case, which reports `axiom`.
 
-M4d1 extends that baseline to 244 cases. It adds 49 header mutations:
+M4d1 extended the 181-case M4c baseline to 244 cases. It added 49 header
+mutations:
 14 for division, five for gcd reduction, 14 for rational representation
 and 16 for normalization. Fourteen further cases cover computations,
 proof interfaces and rejection controls. The computation grids compare
 91 natural division inputs with Python integer division (using zero
 for division by zero), and the numerator and denominator of 114
 normalized fractions with Python's `fractions.Fraction`.
+
+M4d2 adds 129 cases: 40 acceptance cases and 89 rejection controls. Its
+38 arithmetic groups compare 81 ordered input pairs for each of
+addition, multiplication, subtraction and division, and nine inputs for
+each of negation and inversion, against Python's `fractions.Fraction`.
+Negative inputs, unreduced inputs, zero, division by zero and inversion
+of zero are included. Both projections must compute to the oracle
+result by `refl`, giving 684 equality claims. The other acceptance cases
+cover coprime boundaries and fourteen proof interfaces.
+
+The new rejection controls comprise 66 header mutations, twelve false
+numerator or denominator values, seven operation-opacity controls, two
+false zero-result claims and two inverse-cancellation quantity changes.
+The header mutations cover ten coprime statements, sixteen rational
+equality and representation statements, fourteen arithmetic value
+statements and twenty-six field proof statements. The interface cases
+check both erased binders of inverse cancellation. Making a computing
+operation opaque is rejected at the first theorem that unfolds it.
+
+Exactly 52 computation cases use the source prefix through
+`src/RatOps.tot`: the 38 oracle groups, twelve false projection controls
+and two false zero-result controls. The full source acceptance case,
+all theorem and guard mutations, coprime boundaries, field interfaces
+and opacity controls check all twenty-six source files. The complete
+suite has 48 acceptance cases and 325 rejection controls.
 
 The 181 M4c baseline checks:
 
@@ -1377,12 +1503,12 @@ The 181 M4c baseline checks:
   their own, because a mutation of any of them is caught by the theorem
   that cites it.
 
-For 206 rejection controls, including all 59 that M4d1 adds, the runner
-also reads the position of the diagnostic and confirms the name of the
-first failing def. A mutation that moves the rejection to another def
-fails the case. Each mutation helper asserts the exact number of
-occurrences of its anchor, so a rename in a source file stops the
-runner instead of weakening a case.
+For 295 rejection controls, including all 59 that M4d1 adds and all 89
+that M4d2 adds, the runner also reads the position of the diagnostic and
+confirms the name of the first failing def. A mutation that moves the
+rejection to another def fails the case. Each mutation helper asserts
+the exact number of occurrences of its anchor, so a rename in a source
+file stops the runner instead of weakening a case.
 
 The negative controls show that specific proof terms are rejected. They
 do not show that the false statements are unprovable.
@@ -1542,16 +1668,18 @@ arithmetic.
    Done.
 4. M4d1, canonical fractions and normalization, `src/Div.tot`,
    `src/Reduce.tot`, `src/Rat.tot` and `src/RatNormalize.tot`. Done.
-   M4d2 supplies rational arithmetic operations, their field laws and
-   equality of canonical fractions.
+   M4d2, rational arithmetic operations and their field equations,
+   `src/Coprime.tot`, `src/RatEq.tot`, `src/RatOps.tot` and
+   `src/RatField.tot`. Done.
 5. M4e, the order, the `OrderedField` inhabitant and the closed
    instance, `src/RatOrder.tot` and `src/Instance.tot`.
 
-Sources, twenty-four files: `src/Foundation.tot`, `src/Field.tot`,
+Sources, twenty-eight files: `src/Foundation.tot`, `src/Field.tot`,
 `src/Invariant.tot`, `src/Axioms.tot`, `src/Ring.tot`, `src/Laws.tot`,
 `src/Compose.tot`, `src/Frac.tot`, `src/Order.tot`, `src/Pool.tot`,
 `src/Basic.tot`, `src/Product.tot`, `src/NoDrain.tot`,
 `src/PriceImpact.tot`, `src/Liquidity.tot`, `src/Nat.tot`,
 `src/Int.tot`, `src/Gcd.tot`, `src/Div.tot`, `src/Reduce.tot`,
-`src/Rat.tot`, `src/RatNormalize.tot`, `test/check.py`, `README.md`.
-The first twenty-two are the check order.
+`src/Rat.tot`, `src/RatNormalize.tot`, `src/Coprime.tot`,
+`src/RatEq.tot`, `src/RatOps.tot`, `src/RatField.tot`, `test/check.py`,
+`README.md`. The first twenty-six are the check order.

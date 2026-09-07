@@ -1,0 +1,144 @@
+-- Equality of canonical rationals follows from cross multiplication.
+-- Representation proofs let later operations reason about unreduced values.
+
+def ratEqCrossAbs : (a : Int) -> (b : Nat) -> (c : Int) -> (d : Nat) ->
+    (0 h : Eq Int (intMul a (pos d)) (intMul c (pos b))) ->
+    Eq Nat (mul (natAbs a) d) (mul (natAbs c) b) :=
+  fun a b c d h => trans0 Nat
+    (mul (natAbs a) d) (natAbs (intMul a (pos d))) (mul (natAbs c) b)
+    (sym0 Nat (natAbs (intMul a (pos d))) (mul (natAbs a) d)
+      (natAbsMul a (pos d)))
+    (trans0 Nat (natAbs (intMul a (pos d))) (natAbs (intMul c (pos b)))
+      (mul (natAbs c) b)
+      (cong0 Int Nat (intMul a (pos d)) (intMul c (pos b)) natAbs h)
+      (natAbsMul c (pos b)))
+
+def ratCrossDenEq : (r : Rat) -> (s : Rat) ->
+    (0 h : Eq Int (intMul (ratNum r) (pos (ratDen s)))
+      (intMul (ratNum s) (pos (ratDen r)))) ->
+    Eq Nat (ratDen r) (ratDen s) :=
+  fun r s h => natCoprimeCrossDen (natAbs (ratNum r)) (ratDen r)
+    (natAbs (ratNum s)) (ratDen s) (ratReduced r) (ratReduced s)
+    (ratEqCrossAbs (ratNum r) (ratDen r) (ratNum s) (ratDen s) h)
+
+def ratCrossNumEq : (r : Rat) -> (s : Rat) ->
+    (0 h : Eq Int (intMul (ratNum r) (pos (ratDen s)))
+      (intMul (ratNum s) (pos (ratDen r)))) ->
+    (0 hd : Eq Nat (ratDen r) (ratDen s)) -> Eq Int (ratNum r) (ratNum s) :=
+  fun r s h hd => intMulCancelLeft (pos (ratDen r)) (ratNum r) (ratNum s)
+    (fun e => ratDenNeZero r (posInj (ratDen r) zero e))
+    (trans0 Int (intMul (pos (ratDen r)) (ratNum r))
+      (intMul (ratNum r) (pos (ratDen r))) (intMul (pos (ratDen r)) (ratNum s))
+      (intMulComm (pos (ratDen r)) (ratNum r))
+      (trans0 Int (intMul (ratNum r) (pos (ratDen r)))
+        (intMul (ratNum r) (pos (ratDen s))) (intMul (pos (ratDen r)) (ratNum s))
+        (cong0 Nat Int (ratDen r) (ratDen s)
+          (fun d => intMul (ratNum r) (pos d)) hd)
+        (trans0 Int (intMul (ratNum r) (pos (ratDen s)))
+          (intMul (ratNum s) (pos (ratDen r))) (intMul (pos (ratDen r)) (ratNum s))
+          h (intMulComm (ratNum s) (pos (ratDen r))))))
+
+def ratCrossEq : (r : Rat) -> (s : Rat) ->
+    (0 h : Eq Int (intMul (ratNum r) (pos (ratDen s)))
+      (intMul (ratNum s) (pos (ratDen r)))) -> Eq Rat r s :=
+  fun r s h => ratExt r s (ratCrossNumEq r s h (ratCrossDenEq r s h))
+    (ratCrossDenEq r s h)
+
+reducible def ratRep : Rat -> Int -> Nat -> Type 0 :=
+  fun r n d => Eq Int (intMul (ratNum r) (pos d)) (intMul n (pos (ratDen r)))
+
+def ratRepSelf : (r : Rat) -> ratRep r (ratNum r) (ratDen r) :=
+  fun r => refl Int (intMul (ratNum r) (pos (ratDen r)))
+
+def ratRepNormalize : (n : Int) -> (d : Nat) ->
+    (hd : Eq Nat d zero -> Empty) -> ratRep (ratNormalize n (pred d)) n d :=
+  fun n d hd => trans0 Int
+    (intMul (ratNum (ratNormalize n (pred d))) (pos d))
+    (intMul (pos d) (ratNum (ratNormalize n (pred d))))
+    (intMul n (pos (ratDen (ratNormalize n (pred d)))))
+    (intMulComm (ratNum (ratNormalize n (pred d))) (pos d))
+    (trans0 Int (intMul (pos d) (ratNum (ratNormalize n (pred d))))
+      (intMul (pos (succ (pred d))) (ratNum (ratNormalize n (pred d))))
+      (intMul n (pos (ratDen (ratNormalize n (pred d)))))
+      (cong0 Nat Int d (succ (pred d))
+        (fun x => intMul (pos x) (ratNum (ratNormalize n (pred d))))
+        (sym0 Nat (succ (pred d)) d (natSuccPredOfNeZero d hd)))
+      (ratNormalizeValue n (pred d)))
+
+def ratEqMulFront : (a : Int) -> (b : Int) -> (c : Int) ->
+    Eq Int (intMul a (intMul b c)) (intMul (intMul b a) c) :=
+  fun a b c => trans0 Int (intMul a (intMul b c))
+    (intMul (intMul a b) c) (intMul (intMul b a) c)
+    (sym0 Int (intMul (intMul a b) c) (intMul a (intMul b c))
+      (intMulAssoc a b c))
+    (cong0 Int Int (intMul a b) (intMul b a) (fun x => intMul x c)
+      (intMulComm a b))
+
+def ratEqMulTail : (a : Int) -> (b : Int) -> (c : Int) ->
+    Eq Int (intMul (intMul a b) c) (intMul (intMul a c) b) :=
+  fun a b c => trans0 Int (intMul (intMul a b) c)
+    (intMul a (intMul b c)) (intMul (intMul a c) b)
+    (intMulAssoc a b c)
+    (trans0 Int (intMul a (intMul b c)) (intMul a (intMul c b))
+      (intMul (intMul a c) b)
+      (cong0 Int Int (intMul b c) (intMul c b) (fun x => intMul a x)
+        (intMulComm b c))
+      (sym0 Int (intMul (intMul a c) b) (intMul a (intMul c b))
+        (intMulAssoc a c b)))
+
+def ratEqSharedCross : (a : Int) -> (b : Int) -> (c : Int) -> (d : Int) ->
+    (n : Int) -> (k : Int) -> (hk : Eq Int k intZero -> Empty) ->
+    (0 ha : Eq Int (intMul a k) (intMul n b)) ->
+    (0 hc : Eq Int (intMul c k) (intMul n d)) ->
+    Eq Int (intMul a d) (intMul c b) :=
+  fun a b c d n k hk ha hc => intMulCancelLeft k (intMul a d) (intMul c b) hk
+    (trans0 Int (intMul k (intMul a d)) (intMul (intMul a k) d)
+      (intMul k (intMul c b)) (ratEqMulFront k a d)
+      (trans0 Int (intMul (intMul a k) d) (intMul (intMul n b) d)
+        (intMul k (intMul c b))
+        (cong0 Int Int (intMul a k) (intMul n b) (fun x => intMul x d) ha)
+        (trans0 Int (intMul (intMul n b) d) (intMul (intMul n d) b)
+          (intMul k (intMul c b)) (ratEqMulTail n b d)
+          (trans0 Int (intMul (intMul n d) b) (intMul (intMul c k) b)
+            (intMul k (intMul c b))
+            (cong0 Int Int (intMul n d) (intMul c k) (fun x => intMul x b)
+              (sym0 Int (intMul c k) (intMul n d) hc))
+            (sym0 Int (intMul k (intMul c b)) (intMul (intMul c k) b)
+              (ratEqMulFront k c b))))))
+
+def ratRepEq : (r : Rat) -> (s : Rat) -> (n : Int) -> (d : Nat) ->
+    (hd : Eq Nat d zero -> Empty) ->
+    (0 hr : ratRep r n d) -> (0 hs : ratRep s n d) -> Eq Rat r s :=
+  fun r s n d hd hr hs => ratCrossEq r s
+    (ratEqSharedCross (ratNum r) (pos (ratDen r)) (ratNum s) (pos (ratDen s))
+      n (pos d) (fun e => hd (posInj d zero e)) hr hs)
+
+def ratRepTrans : (r : Rat) -> (n : Int) -> (d : Nat) -> (m : Int) -> (e : Nat) ->
+    (hd : Eq Nat d zero -> Empty) -> (0 hr : ratRep r n d) ->
+    (0 h : Eq Int (intMul n (pos e)) (intMul m (pos d))) -> ratRep r m e :=
+  fun r n d m e hd hr h =>
+    ratEqSharedCross (ratNum r) (pos (ratDen r)) m (pos e) n (pos d)
+      (fun hz => hd (posInj d zero hz)) hr
+      (sym0 Int (intMul n (pos e)) (intMul m (pos d)) h)
+
+def ratRepCrossEq : (r : Rat) -> (s : Rat) -> (n : Int) -> (m : Int) ->
+    (d : Nat) -> (e : Nat) ->
+    (hd : Eq Nat d zero -> Empty) -> (he : Eq Nat e zero -> Empty) ->
+    (0 hr : ratRep r n d) -> (0 hs : ratRep s m e) ->
+    (0 h : Eq Int (intMul n (pos e)) (intMul m (pos d))) -> Eq Rat r s :=
+  fun r s n m d e hd he hr hs h => ratRepEq r s m e he
+    (ratRepTrans r n d m e hd hr h) hs
+
+check ratEqCrossAbs
+check ratCrossDenEq
+check ratCrossNumEq
+check ratCrossEq
+check ratRep
+check ratRepSelf
+check ratRepNormalize
+check ratEqMulFront
+check ratEqMulTail
+check ratEqSharedCross
+check ratRepEq
+check ratRepTrans
+check ratRepCrossEq

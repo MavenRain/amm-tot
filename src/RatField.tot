@@ -1,0 +1,682 @@
+-- Field laws for the computing Rat operations, proved through ratRep.
+-- No field or order record is assumed. The representation helpers reduce
+-- each equation to integer ring laws and nonzero denominator cancellation.
+
+-- Integer rearrangements used by the rational field proofs.
+def ratFieldIntOneMul : (a : Int) -> Eq Int (intMul intOne a) a :=
+  fun a => trans0 Int (intMul intOne a) (intMul a intOne) a
+    (intMulComm intOne a) (intMulOne a)
+
+def ratFieldIntAddMul : (a : Int) -> (b : Int) -> (c : Int) ->
+    Eq Int (intMul (intAdd a b) c) (intAdd (intMul a c) (intMul b c)) :=
+  fun a b c => trans0 Int (intMul (intAdd a b) c)
+    (intMul c (intAdd a b)) (intAdd (intMul a c) (intMul b c))
+    (intMulComm (intAdd a b) c)
+    (trans0 Int (intMul c (intAdd a b))
+      (intAdd (intMul c a) (intMul c b)) (intAdd (intMul a c) (intMul b c))
+      (intMulAdd c a b)
+      (trans0 Int (intAdd (intMul c a) (intMul c b))
+        (intAdd (intMul a c) (intMul c b)) (intAdd (intMul a c) (intMul b c))
+        (cong0 Int Int (intMul c a) (intMul a c)
+          (fun z => intAdd z (intMul c b)) (intMulComm c a))
+        (cong0 Int Int (intMul c b) (intMul b c)
+          (fun z => intAdd (intMul a c) z) (intMulComm c b))))
+
+def ratFieldMulSwap : (a : Int) -> (b : Int) -> (d : Int) -> (e : Int) ->
+    Eq Int (intMul (intMul a b) (intMul d e)) (intMul (intMul a d) (intMul b e)) :=
+  fun a b d e => (trans0 Int (intMul (intMul a b) (intMul d e)) (intMul a (intMul b (intMul d
+    e))) (intMul (intMul a d) (intMul b e))
+  (intMulAssoc a b (intMul d e))
+  (sym0 Int (intMul (intMul a d) (intMul b e)) (intMul a (intMul b (intMul d e))) (trans0 Int
+    (intMul (intMul a d) (intMul b e)) (intMul a (intMul d (intMul b e))) (intMul a (intMul b
+    (intMul d e)))
+  (intMulAssoc a d (intMul b e))
+  (cong0 Int Int (intMul d (intMul b e)) (intMul b (intMul d e)) (fun qv => (intMul a qv))
+  (trans0 Int (intMul d (intMul b e)) (intMul (intMul b d) e) (intMul b (intMul d e))
+  (trans0 Int (intMul d (intMul b e)) (intMul (intMul d b) e) (intMul (intMul b d) e)
+  (sym0 Int (intMul (intMul d b) e) (intMul d (intMul b e)) (intMulAssoc d b e))
+  (cong0 Int Int (intMul d b) (intMul b d) (fun qv => (intMul qv e))
+  (intMulComm d b)))
+  (intMulAssoc b d e))))))
+
+def ratFieldMulRotate : (a : Int) -> (b : Int) -> (d : Int) -> (e : Int) ->
+    Eq Int (intMul (intMul a b) (intMul d e)) (intMul (intMul a e) (intMul b d)) :=
+  fun a b d e => (trans0 Int (intMul (intMul a b) (intMul d e)) (intMul a (intMul b (intMul d
+    e))) (intMul (intMul a e) (intMul b d))
+  (intMulAssoc a b (intMul d e))
+  (sym0 Int (intMul (intMul a e) (intMul b d)) (intMul a (intMul b (intMul d e))) (trans0 Int
+    (intMul (intMul a e) (intMul b d)) (intMul a (intMul e (intMul b d))) (intMul a (intMul b
+    (intMul d e)))
+  (intMulAssoc a e (intMul b d))
+  (cong0 Int Int (intMul e (intMul b d)) (intMul b (intMul d e)) (fun qv => (intMul a qv))
+  (trans0 Int (intMul e (intMul b d)) (intMul b (intMul e d)) (intMul b (intMul d e))
+  (trans0 Int (intMul e (intMul b d)) (intMul (intMul b e) d) (intMul b (intMul e d))
+  (trans0 Int (intMul e (intMul b d)) (intMul (intMul e b) d) (intMul (intMul b e) d)
+  (sym0 Int (intMul (intMul e b) d) (intMul e (intMul b d)) (intMulAssoc e b d))
+  (cong0 Int Int (intMul e b) (intMul b e) (fun qv => (intMul qv d))
+  (intMulComm e b)))
+  (intMulAssoc b e d))
+  (cong0 Int Int (intMul e d) (intMul d e) (fun qv => (intMul b qv))
+  (intMulComm e d)))))))
+
+def ratFieldAddRepCore : (a : Int) -> (b : Int) -> (x : Int) -> (y : Int) ->
+    (r : Int) -> (s : Int) -> (n : Int) -> (m : Int) -> (d : Int) -> (e : Int) ->
+    (hk : Eq Int (intMul x y) intZero -> Empty) ->
+    (0 h0 : Eq Int (intMul r (intMul x y)) (intMul (intAdd (intMul a y) (intMul b x)) s)) ->
+    (0 h1 : Eq Int (intMul a d) (intMul n x)) ->
+    (0 h2 : Eq Int (intMul b e) (intMul m y)) -> Eq Int (intMul r (intMul d e)) (intMul (intAdd
+      (intMul n e) (intMul m d)) s) :=
+  fun a b x y r s n m d e hk h0 h1 h2 => intMulCancelLeft (intMul x y) (intMul r (intMul d e))
+    (intMul (intAdd (intMul n e) (intMul m d)) s) hk
+    (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intMul (intAdd (intMul n
+      e) (intMul m d)) (intMul x y)) s) (intMul (intMul x y) (intMul (intAdd (intMul n e)
+      (intMul m d)) s))
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intAdd (intMul (intMul n e)
+    (intMul x y)) (intMul (intMul m d) (intMul x y))) s) (intMul (intMul (intAdd (intMul n e)
+    (intMul m d)) (intMul x y)) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intAdd (intMul (intMul n e)
+    (intMul x y)) (intMul (intMul m d) (intMul y x))) s) (intMul (intAdd (intMul (intMul n e)
+    (intMul x y)) (intMul (intMul m d) (intMul x y))) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intAdd (intMul (intMul n e)
+    (intMul x y)) (intMul (intMul m y) (intMul x d))) s) (intMul (intAdd (intMul (intMul n e)
+    (intMul x y)) (intMul (intMul m d) (intMul y x))) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intAdd (intMul (intMul n x)
+    (intMul y e)) (intMul (intMul m y) (intMul x d))) s) (intMul (intAdd (intMul (intMul n e)
+    (intMul x y)) (intMul (intMul m y) (intMul x d))) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intAdd (intMul (intMul n x)
+    (intMul y e)) (intMul (intMul b e) (intMul x d))) s) (intMul (intAdd (intMul (intMul n x)
+    (intMul y e)) (intMul (intMul m y) (intMul x d))) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intAdd (intMul (intMul a d)
+    (intMul y e)) (intMul (intMul b e) (intMul x d))) s) (intMul (intAdd (intMul (intMul n x)
+    (intMul y e)) (intMul (intMul b e) (intMul x d))) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intAdd (intMul (intMul a d)
+    (intMul y e)) (intMul (intMul b x) (intMul d e))) s) (intMul (intAdd (intMul (intMul a d)
+    (intMul y e)) (intMul (intMul b e) (intMul x d))) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intAdd (intMul (intMul a y)
+    (intMul d e)) (intMul (intMul b x) (intMul d e))) s) (intMul (intAdd (intMul (intMul a d)
+    (intMul y e)) (intMul (intMul b x) (intMul d e))) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intMul (intAdd (intMul a y)
+    (intMul b x)) (intMul d e)) s) (intMul (intAdd (intMul (intMul a y) (intMul d e)) (intMul
+    (intMul b x) (intMul d e))) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intMul (intAdd (intMul a y)
+    (intMul b x)) s) (intMul d e)) (intMul (intMul (intAdd (intMul a y) (intMul b x)) (intMul d
+    e)) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intMul r (intMul x y))
+    (intMul d e)) (intMul (intMul (intAdd (intMul a y) (intMul b x)) s) (intMul d e))
+  (ratEqMulFront (intMul x y) r (intMul d e))
+  (cong0 Int Int (intMul r (intMul x y)) (intMul (intAdd (intMul a y) (intMul b x)) s) (fun qv
+    => (intMul qv (intMul d e)))
+  h0))
+  (ratEqMulTail (intAdd (intMul a y) (intMul b x)) s (intMul d e)))
+  (cong0 Int Int (intMul (intAdd (intMul a y) (intMul b x)) (intMul d e)) (intAdd (intMul
+    (intMul a y) (intMul d e)) (intMul (intMul b x) (intMul d e))) (fun qv => (intMul qv s))
+  (ratFieldIntAddMul (intMul a y) (intMul b x) (intMul d e))))
+  (cong0 Int Int (intAdd (intMul (intMul a y) (intMul d e)) (intMul (intMul b x) (intMul d e)))
+    (intAdd (intMul (intMul a d) (intMul y e)) (intMul (intMul b x) (intMul d e))) (fun qv =>
+    (intMul qv s))
+  (cong0 Int Int (intMul (intMul a y) (intMul d e)) (intMul (intMul a d) (intMul y e)) (fun qv
+    => (intAdd qv (intMul (intMul b x) (intMul d e))))
+  (ratFieldMulSwap a y d e))))
+  (cong0 Int Int (intAdd (intMul (intMul a d) (intMul y e)) (intMul (intMul b x) (intMul d e)))
+    (intAdd (intMul (intMul a d) (intMul y e)) (intMul (intMul b e) (intMul x d))) (fun qv =>
+    (intMul qv s))
+  (cong0 Int Int (intMul (intMul b x) (intMul d e)) (intMul (intMul b e) (intMul x d)) (fun qv
+    => (intAdd (intMul (intMul a d) (intMul y e)) qv))
+  (ratFieldMulRotate b x d e))))
+  (cong0 Int Int (intAdd (intMul (intMul a d) (intMul y e)) (intMul (intMul b e) (intMul x d)))
+    (intAdd (intMul (intMul n x) (intMul y e)) (intMul (intMul b e) (intMul x d))) (fun qv =>
+    (intMul qv s))
+  (cong0 Int Int (intMul (intMul a d) (intMul y e)) (intMul (intMul n x) (intMul y e)) (fun qv
+    => (intAdd qv (intMul (intMul b e) (intMul x d))))
+  (cong0 Int Int (intMul a d) (intMul n x) (fun qv => (intMul qv (intMul y e)))
+  h1))))
+  (cong0 Int Int (intAdd (intMul (intMul n x) (intMul y e)) (intMul (intMul b e) (intMul x d)))
+    (intAdd (intMul (intMul n x) (intMul y e)) (intMul (intMul m y) (intMul x d))) (fun qv =>
+    (intMul qv s))
+  (cong0 Int Int (intMul (intMul b e) (intMul x d)) (intMul (intMul m y) (intMul x d)) (fun qv
+    => (intAdd (intMul (intMul n x) (intMul y e)) qv))
+  (cong0 Int Int (intMul b e) (intMul m y) (fun qv => (intMul qv (intMul x d)))
+  h2))))
+  (cong0 Int Int (intAdd (intMul (intMul n x) (intMul y e)) (intMul (intMul m y) (intMul x d)))
+    (intAdd (intMul (intMul n e) (intMul x y)) (intMul (intMul m y) (intMul x d))) (fun qv =>
+    (intMul qv s))
+  (cong0 Int Int (intMul (intMul n x) (intMul y e)) (intMul (intMul n e) (intMul x y)) (fun qv
+    => (intAdd qv (intMul (intMul m y) (intMul x d))))
+  (ratFieldMulRotate n x y e))))
+  (cong0 Int Int (intAdd (intMul (intMul n e) (intMul x y)) (intMul (intMul m y) (intMul x d)))
+    (intAdd (intMul (intMul n e) (intMul x y)) (intMul (intMul m d) (intMul y x))) (fun qv =>
+    (intMul qv s))
+  (cong0 Int Int (intMul (intMul m y) (intMul x d)) (intMul (intMul m d) (intMul y x)) (fun qv
+    => (intAdd (intMul (intMul n e) (intMul x y)) qv))
+  (ratFieldMulRotate m y x d))))
+  (cong0 Int Int (intAdd (intMul (intMul n e) (intMul x y)) (intMul (intMul m d) (intMul y x)))
+    (intAdd (intMul (intMul n e) (intMul x y)) (intMul (intMul m d) (intMul x y))) (fun qv =>
+    (intMul qv s))
+  (cong0 Int Int (intMul (intMul m d) (intMul y x)) (intMul (intMul m d) (intMul x y)) (fun qv
+    => (intAdd (intMul (intMul n e) (intMul x y)) qv))
+  (cong0 Int Int (intMul y x) (intMul x y) (fun qv => (intMul (intMul m d) qv))
+  (intMulComm y x)))))
+  (cong0 Int Int (intAdd (intMul (intMul n e) (intMul x y)) (intMul (intMul m d) (intMul x y)))
+    (intMul (intAdd (intMul n e) (intMul m d)) (intMul x y)) (fun qv => (intMul qv s))
+  (sym0 Int (intMul (intAdd (intMul n e) (intMul m d)) (intMul x y)) (intAdd (intMul (intMul n
+    e) (intMul x y)) (intMul (intMul m d) (intMul x y))) (ratFieldIntAddMul (intMul n e) (intMul
+    m d) (intMul x y)))))
+  (sym0 Int (intMul (intMul x y) (intMul (intAdd (intMul n e) (intMul m d)) s)) (intMul (intMul
+    (intAdd (intMul n e) (intMul m d)) (intMul x y)) s) (ratEqMulFront (intMul x y) (intAdd
+    (intMul n e) (intMul m d)) s)))
+
+def ratFieldMulRepCore : (a : Int) -> (b : Int) -> (x : Int) -> (y : Int) ->
+    (r : Int) -> (s : Int) -> (n : Int) -> (m : Int) -> (d : Int) -> (e : Int) ->
+    (hk : Eq Int (intMul x y) intZero -> Empty) ->
+    (0 h0 : Eq Int (intMul r (intMul x y)) (intMul (intMul a b) s)) ->
+    (0 h1 : Eq Int (intMul a d) (intMul n x)) ->
+    (0 h2 : Eq Int (intMul b e) (intMul m y)) -> Eq Int (intMul r (intMul d e)) (intMul (intMul
+      n m) s) :=
+  fun a b x y r s n m d e hk h0 h1 h2 => intMulCancelLeft (intMul x y) (intMul r (intMul d e))
+    (intMul (intMul n m) s) hk
+    (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intMul (intMul n m)
+      (intMul x y)) s) (intMul (intMul x y) (intMul (intMul n m) s))
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intMul (intMul n x) (intMul
+    m y)) s) (intMul (intMul (intMul n m) (intMul x y)) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intMul (intMul n x) (intMul
+    b e)) s) (intMul (intMul (intMul n x) (intMul m y)) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intMul (intMul a d) (intMul
+    b e)) s) (intMul (intMul (intMul n x) (intMul b e)) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intMul (intMul a b) (intMul
+    d e)) s) (intMul (intMul (intMul a d) (intMul b e)) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intMul (intMul a b) s)
+    (intMul d e)) (intMul (intMul (intMul a b) (intMul d e)) s)
+  (trans0 Int (intMul (intMul x y) (intMul r (intMul d e))) (intMul (intMul r (intMul x y))
+    (intMul d e)) (intMul (intMul (intMul a b) s) (intMul d e))
+  (ratEqMulFront (intMul x y) r (intMul d e))
+  (cong0 Int Int (intMul r (intMul x y)) (intMul (intMul a b) s) (fun qv => (intMul qv (intMul d
+    e)))
+  h0))
+  (ratEqMulTail (intMul a b) s (intMul d e)))
+  (cong0 Int Int (intMul (intMul a b) (intMul d e)) (intMul (intMul a d) (intMul b e)) (fun qv
+    => (intMul qv s))
+  (ratFieldMulSwap a b d e)))
+  (cong0 Int Int (intMul (intMul a d) (intMul b e)) (intMul (intMul n x) (intMul b e)) (fun qv
+    => (intMul qv s))
+  (cong0 Int Int (intMul a d) (intMul n x) (fun qv => (intMul qv (intMul b e)))
+  h1)))
+  (cong0 Int Int (intMul (intMul n x) (intMul b e)) (intMul (intMul n x) (intMul m y)) (fun qv
+    => (intMul qv s))
+  (cong0 Int Int (intMul b e) (intMul m y) (fun qv => (intMul (intMul n x) qv))
+  h2)))
+  (cong0 Int Int (intMul (intMul n x) (intMul m y)) (intMul (intMul n m) (intMul x y)) (fun qv
+    => (intMul qv s))
+  (ratFieldMulSwap n x m y)))
+  (sym0 Int (intMul (intMul x y) (intMul (intMul n m) s)) (intMul (intMul (intMul n m) (intMul x
+    y)) s) (ratEqMulFront (intMul x y) (intMul n m) s)))
+
+-- A representation remains valid when the input fractions are replaced
+-- by any cross-equivalent numerator and denominator pair.
+def ratAddRep : (a : Rat) -> (b : Rat) -> (n : Int) -> (m : Int) -> (d : Nat) -> (e : Nat) ->
+    (0 ha : ratRep a n d) -> (0 hb : ratRep b m e) ->
+    ratRep (ratAdd a b) (intAdd (intMul n (pos e)) (intMul m (pos d))) (mul d e) :=
+  fun a b n m d e ha hb => ratFieldAddRepCore (ratNum a) (ratNum b) (pos (ratDen a)) (pos
+    (ratDen b))
+    (ratNum (ratAdd a b)) (pos (ratDen (ratAdd a b))) n m (pos d) (pos e)
+    (fun h => ratDenMulNeZero a b (posInj (mul (ratDen a) (ratDen b)) zero h))
+    (ratAddValue a b) ha hb
+
+def ratMulRep : (a : Rat) -> (b : Rat) -> (n : Int) -> (m : Int) -> (d : Nat) -> (e : Nat) ->
+    (0 ha : ratRep a n d) -> (0 hb : ratRep b m e) ->
+    ratRep (ratMul a b) (intMul n m) (mul d e) :=
+  fun a b n m d e ha hb => ratFieldMulRepCore (ratNum a) (ratNum b) (pos (ratDen a)) (pos
+    (ratDen b))
+    (ratNum (ratMul a b)) (pos (ratDen (ratMul a b))) n m (pos d) (pos e)
+    (fun h => ratDenMulNeZero a b (posInj (mul (ratDen a) (ratDen b)) zero h))
+    (ratMulValue a b) ha hb
+
+def ratFieldNatMulNeZero : (a : Nat) -> (b : Nat) -> (ha : Eq Nat a zero -> Empty) ->
+    (hb : Eq Nat b zero -> Empty) -> Eq Nat (mul a b) zero -> Empty :=
+  fun a b ha hb h => hb (natMulEqZeroRight a b ha h)
+
+def ratRepZero : (d : Nat) -> ratRep ratZero intZero d :=
+  fun d => trans0 Int (intMul intZero (pos d)) intZero (intMul intZero intOne)
+    (intMulZeroLeft (pos d)) (sym0 Int (intMul intZero intOne) intZero (intMulZeroLeft intOne))
+
+def ratRepCast : (r : Rat) -> (n : Int) -> (m : Int) -> (d : Nat) -> (e : Nat) ->
+    (0 hn : Eq Int n m) -> (0 hd : Eq Nat d e) -> ratRep r n d -> ratRep r m e :=
+  fun r n m d e hn hd h => subst0 Nat d e (fun z => ratRep r m z) hd
+    (subst0 Int n m (fun z => ratRep r z d) hn h)
+
+def ratFieldScaleCore : (a : Int) -> (b : Int) -> (c : Int) -> (d : Int) -> (k : Int) ->
+    (0 h : Eq Int (intMul a d) (intMul b c)) ->
+    Eq Int (intMul a (intMul d k)) (intMul (intMul b k) c) :=
+  fun a b c d k h => (trans0 Int (intMul a (intMul d k)) (intMul (intMul b c) k) (intMul (intMul
+    b k) c)
+  (trans0 Int (intMul a (intMul d k)) (intMul (intMul a d) k) (intMul (intMul b c) k)
+  (sym0 Int (intMul (intMul a d) k) (intMul a (intMul d k)) (intMulAssoc a d k))
+  (cong0 Int Int (intMul a d) (intMul b c) (fun qv => (intMul qv k))
+  h))
+  (trans0 Int (intMul (intMul b c) k) (intMul b (intMul c k)) (intMul (intMul b k) c)
+  (intMulAssoc b c k)
+  (sym0 Int (intMul (intMul b k) c) (intMul b (intMul c k)) (trans0 Int (intMul (intMul b k) c)
+    (intMul b (intMul k c)) (intMul b (intMul c k))
+  (intMulAssoc b k c)
+  (cong0 Int Int (intMul k c) (intMul c k) (fun qv => (intMul b qv))
+  (intMulComm k c))))))
+
+def ratRepScale : (r : Rat) -> (n : Int) -> (d : Nat) -> (k : Nat) ->
+    (0 h : ratRep r n d) -> ratRep r (intMul n (pos k)) (mul d k) :=
+  fun r n d k h => ratFieldScaleCore (ratNum r) n (pos (ratDen r)) (pos d) (pos k) h
+
+def ratFieldNatOneMul : (a : Nat) -> Eq Nat (mul one a) a :=
+  fun a => trans0 Nat (mul one a) (mul a one) a (mulComm one a) (mulOne a)
+
+def ratFieldAddAssocNum : (a : Int) -> (b : Int) -> (c : Int) -> (x : Int) -> (y : Int) -> (z :
+  Int) ->
+    Eq Int (intAdd (intMul (intAdd (intMul a y) (intMul b x)) z) (intMul c (intMul x y)))
+      (intAdd (intMul a (intMul y z)) (intMul (intAdd (intMul b z) (intMul c y)) x)) :=
+  fun a b c x y z => (trans0 Int (intAdd (intMul (intAdd (intMul a y) (intMul b x)) z) (intMul c
+    (intMul x y))) (intAdd (intMul a (intMul y z)) (intAdd (intMul (intMul b z) x) (intMul
+    (intMul c y) x))) (intAdd (intMul a (intMul y z)) (intMul (intAdd (intMul b z) (intMul c y))
+    x))
+  (trans0 Int (intAdd (intMul (intAdd (intMul a y) (intMul b x)) z) (intMul c (intMul x y)))
+    (intAdd (intAdd (intMul a (intMul y z)) (intMul (intMul b z) x)) (intMul (intMul c y) x))
+    (intAdd (intMul a (intMul y z)) (intAdd (intMul (intMul b z) x) (intMul (intMul c y) x)))
+  (trans0 Int (intAdd (intMul (intAdd (intMul a y) (intMul b x)) z) (intMul c (intMul x y)))
+    (intAdd (intAdd (intMul a (intMul y z)) (intMul (intMul b z) x)) (intMul (intMul c x) y))
+    (intAdd (intAdd (intMul a (intMul y z)) (intMul (intMul b z) x)) (intMul (intMul c y) x))
+  (trans0 Int (intAdd (intMul (intAdd (intMul a y) (intMul b x)) z) (intMul c (intMul x y)))
+    (intAdd (intAdd (intMul a (intMul y z)) (intMul (intMul b z) x)) (intMul c (intMul x y)))
+    (intAdd (intAdd (intMul a (intMul y z)) (intMul (intMul b z) x)) (intMul (intMul c x) y))
+  (trans0 Int (intAdd (intMul (intAdd (intMul a y) (intMul b x)) z) (intMul c (intMul x y)))
+    (intAdd (intAdd (intMul a (intMul y z)) (intMul (intMul b x) z)) (intMul c (intMul x y)))
+    (intAdd (intAdd (intMul a (intMul y z)) (intMul (intMul b z) x)) (intMul c (intMul x y)))
+  (trans0 Int (intAdd (intMul (intAdd (intMul a y) (intMul b x)) z) (intMul c (intMul x y)))
+    (intAdd (intAdd (intMul (intMul a y) z) (intMul (intMul b x) z)) (intMul c (intMul x y)))
+    (intAdd (intAdd (intMul a (intMul y z)) (intMul (intMul b x) z)) (intMul c (intMul x y)))
+  (cong0 Int Int (intMul (intAdd (intMul a y) (intMul b x)) z) (intAdd (intMul (intMul a y) z)
+    (intMul (intMul b x) z)) (fun qv => (intAdd qv (intMul c (intMul x y))))
+  (ratFieldIntAddMul (intMul a y) (intMul b x) z))
+  (cong0 Int Int (intAdd (intMul (intMul a y) z) (intMul (intMul b x) z)) (intAdd (intMul a
+    (intMul y z)) (intMul (intMul b x) z)) (fun qv => (intAdd qv (intMul c (intMul x y))))
+  (cong0 Int Int (intMul (intMul a y) z) (intMul a (intMul y z)) (fun qv => (intAdd qv (intMul
+    (intMul b x) z)))
+  (intMulAssoc a y z))))
+  (cong0 Int Int (intAdd (intMul a (intMul y z)) (intMul (intMul b x) z)) (intAdd (intMul a
+    (intMul y z)) (intMul (intMul b z) x)) (fun qv => (intAdd qv (intMul c (intMul x y))))
+  (cong0 Int Int (intMul (intMul b x) z) (intMul (intMul b z) x) (fun qv => (intAdd (intMul a
+    (intMul y z)) qv))
+  (ratEqMulTail b x z))))
+  (cong0 Int Int (intMul c (intMul x y)) (intMul (intMul c x) y) (fun qv => (intAdd (intAdd
+    (intMul a (intMul y z)) (intMul (intMul b z) x)) qv))
+  (sym0 Int (intMul (intMul c x) y) (intMul c (intMul x y)) (intMulAssoc c x y))))
+  (cong0 Int Int (intMul (intMul c x) y) (intMul (intMul c y) x) (fun qv => (intAdd (intAdd
+    (intMul a (intMul y z)) (intMul (intMul b z) x)) qv))
+  (ratEqMulTail c x y)))
+  (intAddAssoc (intMul a (intMul y z)) (intMul (intMul b z) x) (intMul (intMul c y) x)))
+  (cong0 Int Int (intAdd (intMul (intMul b z) x) (intMul (intMul c y) x)) (intMul (intAdd
+    (intMul b z) (intMul c y)) x) (fun qv => (intAdd (intMul a (intMul y z)) qv))
+  (sym0 Int (intMul (intAdd (intMul b z) (intMul c y)) x) (intAdd (intMul (intMul b z) x)
+    (intMul (intMul c y) x)) (ratFieldIntAddMul (intMul b z) (intMul c y) x))))
+
+def ratFieldMulAddNum : (a : Int) -> (b : Int) -> (c : Int) -> (x : Int) -> (y : Int) -> (z :
+  Int) ->
+    Eq Int (intMul (intMul a (intAdd (intMul b z) (intMul c y))) x) (intAdd (intMul (intMul a b)
+      (intMul x z)) (intMul (intMul a c) (intMul x y))) :=
+  fun a b c x y z => (trans0 Int (intMul (intMul a (intAdd (intMul b z) (intMul c y))) x)
+    (intAdd (intMul (intMul a b) (intMul x z)) (intMul (intMul (intMul a c) x) y)) (intAdd
+    (intMul (intMul a b) (intMul x z)) (intMul (intMul a c) (intMul x y)))
+  (trans0 Int (intMul (intMul a (intAdd (intMul b z) (intMul c y))) x) (intAdd (intMul (intMul a
+    b) (intMul x z)) (intMul (intMul (intMul a c) y) x)) (intAdd (intMul (intMul a b) (intMul x
+    z)) (intMul (intMul (intMul a c) x) y))
+  (trans0 Int (intMul (intMul a (intAdd (intMul b z) (intMul c y))) x) (intAdd (intMul (intMul
+    (intMul a b) x) z) (intMul (intMul (intMul a c) y) x)) (intAdd (intMul (intMul a b) (intMul
+    x z)) (intMul (intMul (intMul a c) y) x))
+  (trans0 Int (intMul (intMul a (intAdd (intMul b z) (intMul c y))) x) (intAdd (intMul (intMul
+    (intMul a b) z) x) (intMul (intMul (intMul a c) y) x)) (intAdd (intMul (intMul (intMul a b)
+    x) z) (intMul (intMul (intMul a c) y) x))
+  (trans0 Int (intMul (intMul a (intAdd (intMul b z) (intMul c y))) x) (intAdd (intMul (intMul
+    (intMul a b) z) x) (intMul (intMul a (intMul c y)) x)) (intAdd (intMul (intMul (intMul a b)
+    z) x) (intMul (intMul (intMul a c) y) x))
+  (trans0 Int (intMul (intMul a (intAdd (intMul b z) (intMul c y))) x) (intAdd (intMul (intMul a
+    (intMul b z)) x) (intMul (intMul a (intMul c y)) x)) (intAdd (intMul (intMul (intMul a b) z)
+    x) (intMul (intMul a (intMul c y)) x))
+  (trans0 Int (intMul (intMul a (intAdd (intMul b z) (intMul c y))) x) (intMul (intAdd (intMul a
+    (intMul b z)) (intMul a (intMul c y))) x) (intAdd (intMul (intMul a (intMul b z)) x) (intMul
+    (intMul a (intMul c y)) x))
+  (cong0 Int Int (intMul a (intAdd (intMul b z) (intMul c y))) (intAdd (intMul a (intMul b z))
+    (intMul a (intMul c y))) (fun qv => (intMul qv x))
+  (intMulAdd a (intMul b z) (intMul c y)))
+  (ratFieldIntAddMul (intMul a (intMul b z)) (intMul a (intMul c y)) x))
+  (cong0 Int Int (intMul (intMul a (intMul b z)) x) (intMul (intMul (intMul a b) z) x) (fun qv
+    => (intAdd qv (intMul (intMul a (intMul c y)) x)))
+  (cong0 Int Int (intMul a (intMul b z)) (intMul (intMul a b) z) (fun qv => (intMul qv x))
+  (sym0 Int (intMul (intMul a b) z) (intMul a (intMul b z)) (intMulAssoc a b z)))))
+  (cong0 Int Int (intMul (intMul a (intMul c y)) x) (intMul (intMul (intMul a c) y) x) (fun qv
+    => (intAdd (intMul (intMul (intMul a b) z) x) qv))
+  (cong0 Int Int (intMul a (intMul c y)) (intMul (intMul a c) y) (fun qv => (intMul qv x))
+  (sym0 Int (intMul (intMul a c) y) (intMul a (intMul c y)) (intMulAssoc a c y)))))
+  (cong0 Int Int (intMul (intMul (intMul a b) z) x) (intMul (intMul (intMul a b) x) z) (fun qv
+    => (intAdd qv (intMul (intMul (intMul a c) y) x)))
+  (ratEqMulTail (intMul a b) z x)))
+  (cong0 Int Int (intMul (intMul (intMul a b) x) z) (intMul (intMul a b) (intMul x z)) (fun qv
+    => (intAdd qv (intMul (intMul (intMul a c) y) x)))
+  (intMulAssoc (intMul a b) x z)))
+  (cong0 Int Int (intMul (intMul (intMul a c) y) x) (intMul (intMul (intMul a c) x) y) (fun qv
+    => (intAdd (intMul (intMul a b) (intMul x z)) qv))
+  (ratEqMulTail (intMul a c) y x)))
+  (cong0 Int Int (intMul (intMul (intMul a c) x) y) (intMul (intMul a c) (intMul x y)) (fun qv
+    => (intAdd (intMul (intMul a b) (intMul x z)) qv))
+  (intMulAssoc (intMul a c) x y)))
+
+def ratAddComm : (a : Rat) -> (b : Rat) -> Eq Rat (ratAdd a b) (ratAdd b a) :=
+  fun a b => ratRepEq (ratAdd a b) (ratAdd b a) (intAdd (intMul (ratNum b) (pos (ratDen a)))
+    (intMul (ratNum a) (pos (ratDen b)))) (mul (ratDen b) (ratDen a))
+    (ratFieldNatMulNeZero (ratDen b) (ratDen a) (fun h => ratDenNeZero b h) (fun h =>
+      ratDenNeZero a h))
+    (ratRepCast (ratAdd a b) (intAdd (intMul (ratNum a) (pos (ratDen b))) (intMul (ratNum b)
+      (pos (ratDen a)))) (intAdd (intMul (ratNum b) (pos (ratDen a))) (intMul (ratNum a) (pos
+      (ratDen b)))) (mul (ratDen a) (ratDen b)) (mul (ratDen b) (ratDen a))
+      (sym0 Int (intAdd (intMul (ratNum b) (pos (ratDen a))) (intMul (ratNum a) (pos (ratDen
+        b)))) (intAdd (intMul (ratNum a) (pos (ratDen b))) (intMul (ratNum b) (pos (ratDen a))))
+        (intAddComm (intMul (ratNum b) (pos (ratDen a))) (intMul (ratNum a) (pos (ratDen b)))))
+      (sym0 Nat (mul (ratDen b) (ratDen a)) (mul (ratDen a) (ratDen b)) (mulComm (ratDen b)
+        (ratDen a)))
+      (ratAddRep a b (ratNum a) (ratNum b) (ratDen a) (ratDen b)
+    (ratRepSelf a)
+    (ratRepSelf b)))
+    (ratAddRep b a (ratNum b) (ratNum a) (ratDen b) (ratDen a)
+    (ratRepSelf b)
+    (ratRepSelf a))
+
+def ratAddAssoc : (a : Rat) -> (b : Rat) -> (c : Rat) -> Eq Rat (ratAdd (ratAdd a b) c) (ratAdd
+  a (ratAdd b c)) :=
+  fun a b c => ratRepEq (ratAdd (ratAdd a b) c) (ratAdd a (ratAdd b c)) (intAdd (intMul (ratNum
+    a) (intMul (pos (ratDen b)) (pos (ratDen c)))) (intMul (intAdd (intMul (ratNum b) (pos
+    (ratDen c))) (intMul (ratNum c) (pos (ratDen b)))) (pos (ratDen a)))) (mul (ratDen a) (mul
+    (ratDen b) (ratDen c)))
+    (ratFieldNatMulNeZero (ratDen a) (mul (ratDen b) (ratDen c)) (fun h => ratDenNeZero a h)
+      (ratFieldNatMulNeZero (ratDen b) (ratDen c) (fun h => ratDenNeZero b h) (fun h =>
+      ratDenNeZero c h)))
+    (ratRepCast (ratAdd (ratAdd a b) c) (intAdd (intMul (intAdd (intMul (ratNum a) (pos (ratDen
+      b))) (intMul (ratNum b) (pos (ratDen a)))) (pos (ratDen c))) (intMul (ratNum c) (intMul
+      (pos (ratDen a)) (pos (ratDen b))))) (intAdd (intMul (ratNum a) (intMul (pos (ratDen b))
+      (pos (ratDen c)))) (intMul (intAdd (intMul (ratNum b) (pos (ratDen c))) (intMul (ratNum c)
+      (pos (ratDen b)))) (pos (ratDen a)))) (mul (mul (ratDen a) (ratDen b)) (ratDen c)) (mul
+      (ratDen a) (mul (ratDen b) (ratDen c)))
+      (ratFieldAddAssocNum (ratNum a) (ratNum b) (ratNum c) (pos (ratDen a)) (pos (ratDen b))
+        (pos (ratDen c)))
+      (mulAssoc (ratDen a) (ratDen b) (ratDen c))
+      (ratAddRep (ratAdd a b) c (intAdd (intMul (ratNum a) (pos (ratDen b))) (intMul (ratNum b)
+        (pos (ratDen a)))) (ratNum c) (mul (ratDen a) (ratDen b)) (ratDen c)
+    (ratAddRep a b (ratNum a) (ratNum b) (ratDen a) (ratDen b)
+    (ratRepSelf a)
+    (ratRepSelf b))
+    (ratRepSelf c)))
+    (ratAddRep a (ratAdd b c) (ratNum a) (intAdd (intMul (ratNum b) (pos (ratDen c))) (intMul
+      (ratNum c) (pos (ratDen b)))) (ratDen a) (mul (ratDen b) (ratDen c))
+    (ratRepSelf a)
+    (ratAddRep b c (ratNum b) (ratNum c) (ratDen b) (ratDen c)
+    (ratRepSelf b)
+    (ratRepSelf c)))
+
+def ratAddZero : (a : Rat) -> Eq Rat (ratAdd a ratZero) a :=
+  fun a => ratRepEq (ratAdd a ratZero) a (ratNum a) (ratDen a)
+    (fun h => ratDenNeZero a h)
+    (ratRepCast (ratAdd a ratZero) (intAdd (intMul (ratNum a) intOne) (intMul intZero (pos
+      (ratDen a)))) (ratNum a) (mul (ratDen a) one) (ratDen a)
+      (trans0 Int (intAdd (intMul (ratNum a) intOne) (intMul intZero (pos (ratDen a)))) (intAdd
+        (ratNum a) intZero) (ratNum a)
+  (trans0 Int (intAdd (intMul (ratNum a) intOne) (intMul intZero (pos (ratDen a)))) (intAdd
+    (ratNum a) (intMul intZero (pos (ratDen a)))) (intAdd (ratNum a) intZero)
+  (cong0 Int Int (intMul (ratNum a) intOne) (ratNum a) (fun qv => (intAdd qv (intMul intZero
+    (pos (ratDen a)))))
+  (intMulOne (ratNum a)))
+  (cong0 Int Int (intMul intZero (pos (ratDen a))) intZero (fun qv => (intAdd (ratNum a) qv))
+  (intMulZeroLeft (pos (ratDen a)))))
+  (intAddZero (ratNum a)))
+      (mulOne (ratDen a))
+      (ratAddRep a ratZero (ratNum a) intZero (ratDen a) one
+    (ratRepSelf a)
+    (ratRepSelf ratZero)))
+    (ratRepSelf a)
+
+def ratAddNegCancel : (a : Rat) -> Eq Rat (ratAdd a (ratNeg a)) ratZero :=
+  fun a => ratRepEq (ratAdd a (ratNeg a)) ratZero intZero (mul (ratDen a) (ratDen a))
+    (ratFieldNatMulNeZero (ratDen a) (ratDen a) (fun h => ratDenNeZero a h) (fun h =>
+      ratDenNeZero a h))
+    (ratRepCast (ratAdd a (ratNeg a)) (intAdd (intMul (ratNum a) (pos (ratDen a))) (intMul
+      (intNeg (ratNum a)) (pos (ratDen a)))) intZero (mul (ratDen a) (ratDen a)) (mul (ratDen a)
+      (ratDen a))
+      (trans0 Int (intAdd (intMul (ratNum a) (pos (ratDen a))) (intMul (intNeg (ratNum a)) (pos
+        (ratDen a)))) (intMul intZero (pos (ratDen a))) intZero
+  (trans0 Int (intAdd (intMul (ratNum a) (pos (ratDen a))) (intMul (intNeg (ratNum a)) (pos
+    (ratDen a)))) (intMul (intAdd (ratNum a) (intNeg (ratNum a))) (pos (ratDen a))) (intMul
+    intZero (pos (ratDen a)))
+  (trans0 Int (intAdd (intMul (ratNum a) (pos (ratDen a))) (intMul (intNeg (ratNum a)) (pos
+    (ratDen a)))) (intAdd (intMul (intNeg (ratNum a)) (pos (ratDen a))) (intMul (pos (ratDen a))
+    (ratNum a))) (intMul (intAdd (ratNum a) (intNeg (ratNum a))) (pos (ratDen a)))
+  (trans0 Int (intAdd (intMul (ratNum a) (pos (ratDen a))) (intMul (intNeg (ratNum a)) (pos
+    (ratDen a)))) (intAdd (intMul (pos (ratDen a)) (ratNum a)) (intMul (intNeg (ratNum a)) (pos
+    (ratDen a)))) (intAdd (intMul (intNeg (ratNum a)) (pos (ratDen a))) (intMul (pos (ratDen a))
+    (ratNum a)))
+  (cong0 Int Int (intMul (ratNum a) (pos (ratDen a))) (intMul (pos (ratDen a)) (ratNum a)) (fun
+    qv => (intAdd qv (intMul (intNeg (ratNum a)) (pos (ratDen a)))))
+  (intMulComm (ratNum a) (pos (ratDen a))))
+  (intAddComm (intMul (pos (ratDen a)) (ratNum a)) (intMul (intNeg (ratNum a)) (pos (ratDen
+    a)))))
+  (sym0 Int (intMul (intAdd (ratNum a) (intNeg (ratNum a))) (pos (ratDen a))) (intAdd (intMul
+    (intNeg (ratNum a)) (pos (ratDen a))) (intMul (pos (ratDen a)) (ratNum a))) (trans0 Int
+    (intMul (intAdd (ratNum a) (intNeg (ratNum a))) (pos (ratDen a))) (intMul (intAdd (intNeg
+    (ratNum a)) (ratNum a)) (pos (ratDen a))) (intAdd (intMul (intNeg (ratNum a)) (pos (ratDen
+    a))) (intMul (pos (ratDen a)) (ratNum a)))
+  (cong0 Int Int (intAdd (ratNum a) (intNeg (ratNum a))) (intAdd (intNeg (ratNum a)) (ratNum a))
+    (fun qv => (intMul qv (pos (ratDen a))))
+  (intAddComm (ratNum a) (intNeg (ratNum a))))
+  (trans0 Int (intMul (intAdd (intNeg (ratNum a)) (ratNum a)) (pos (ratDen a))) (intAdd (intMul
+    (intNeg (ratNum a)) (pos (ratDen a))) (intMul (ratNum a) (pos (ratDen a)))) (intAdd (intMul
+    (intNeg (ratNum a)) (pos (ratDen a))) (intMul (pos (ratDen a)) (ratNum a)))
+  (ratFieldIntAddMul (intNeg (ratNum a)) (ratNum a) (pos (ratDen a)))
+  (cong0 Int Int (intMul (ratNum a) (pos (ratDen a))) (intMul (pos (ratDen a)) (ratNum a)) (fun
+    qv => (intAdd (intMul (intNeg (ratNum a)) (pos (ratDen a))) qv))
+  (intMulComm (ratNum a) (pos (ratDen a))))))))
+  (cong0 Int Int (intAdd (ratNum a) (intNeg (ratNum a))) intZero (fun qv => (intMul qv (pos
+    (ratDen a))))
+  (intAddNegCancel (ratNum a))))
+  (intMulZeroLeft (pos (ratDen a))))
+      (refl Nat (mul (ratDen a) (ratDen a)))
+      (ratAddRep a (ratNeg a) (ratNum a) (intNeg (ratNum a)) (ratDen a) (ratDen a)
+    (ratRepSelf a)
+    (ratNegValue a)))
+    (ratRepZero (mul (ratDen a) (ratDen a)))
+
+def ratMulComm : (a : Rat) -> (b : Rat) -> Eq Rat (ratMul a b) (ratMul b a) :=
+  fun a b => ratRepEq (ratMul a b) (ratMul b a) (intMul (ratNum b) (ratNum a)) (mul (ratDen b)
+    (ratDen a))
+    (ratFieldNatMulNeZero (ratDen b) (ratDen a) (fun h => ratDenNeZero b h) (fun h =>
+      ratDenNeZero a h))
+    (ratRepCast (ratMul a b) (intMul (ratNum a) (ratNum b)) (intMul (ratNum b) (ratNum a)) (mul
+      (ratDen a) (ratDen b)) (mul (ratDen b) (ratDen a))
+      (sym0 Int (intMul (ratNum b) (ratNum a)) (intMul (ratNum a) (ratNum b)) (intMulComm
+        (ratNum b) (ratNum a)))
+      (sym0 Nat (mul (ratDen b) (ratDen a)) (mul (ratDen a) (ratDen b)) (mulComm (ratDen b)
+        (ratDen a)))
+      (ratMulRep a b (ratNum a) (ratNum b) (ratDen a) (ratDen b)
+    (ratRepSelf a)
+    (ratRepSelf b)))
+    (ratMulRep b a (ratNum b) (ratNum a) (ratDen b) (ratDen a)
+    (ratRepSelf b)
+    (ratRepSelf a))
+
+def ratMulAssoc : (a : Rat) -> (b : Rat) -> (c : Rat) -> Eq Rat (ratMul (ratMul a b) c) (ratMul
+  a (ratMul b c)) :=
+  fun a b c => ratRepEq (ratMul (ratMul a b) c) (ratMul a (ratMul b c)) (intMul (ratNum a)
+    (intMul (ratNum b) (ratNum c))) (mul (ratDen a) (mul (ratDen b) (ratDen c)))
+    (ratFieldNatMulNeZero (ratDen a) (mul (ratDen b) (ratDen c)) (fun h => ratDenNeZero a h)
+      (ratFieldNatMulNeZero (ratDen b) (ratDen c) (fun h => ratDenNeZero b h) (fun h =>
+      ratDenNeZero c h)))
+    (ratRepCast (ratMul (ratMul a b) c) (intMul (intMul (ratNum a) (ratNum b)) (ratNum c))
+      (intMul (ratNum a) (intMul (ratNum b) (ratNum c))) (mul (mul (ratDen a) (ratDen b))
+      (ratDen c)) (mul (ratDen a) (mul (ratDen b) (ratDen c)))
+      (intMulAssoc (ratNum a) (ratNum b) (ratNum c))
+      (mulAssoc (ratDen a) (ratDen b) (ratDen c))
+      (ratMulRep (ratMul a b) c (intMul (ratNum a) (ratNum b)) (ratNum c) (mul (ratDen a)
+        (ratDen b)) (ratDen c)
+    (ratMulRep a b (ratNum a) (ratNum b) (ratDen a) (ratDen b)
+    (ratRepSelf a)
+    (ratRepSelf b))
+    (ratRepSelf c)))
+    (ratMulRep a (ratMul b c) (ratNum a) (intMul (ratNum b) (ratNum c)) (ratDen a) (mul (ratDen
+      b) (ratDen c))
+    (ratRepSelf a)
+    (ratMulRep b c (ratNum b) (ratNum c) (ratDen b) (ratDen c)
+    (ratRepSelf b)
+    (ratRepSelf c)))
+
+def ratMulOne : (a : Rat) -> Eq Rat (ratMul a ratOne) a :=
+  fun a => ratRepEq (ratMul a ratOne) a (ratNum a) (ratDen a)
+    (fun h => ratDenNeZero a h)
+    (ratRepCast (ratMul a ratOne) (intMul (ratNum a) intOne) (ratNum a) (mul (ratDen a) one)
+      (ratDen a)
+      (intMulOne (ratNum a))
+      (mulOne (ratDen a))
+      (ratMulRep a ratOne (ratNum a) intOne (ratDen a) one
+    (ratRepSelf a)
+    (ratRepSelf ratOne)))
+    (ratRepSelf a)
+
+def ratMulAdd : (a : Rat) -> (b : Rat) -> (c : Rat) -> Eq Rat (ratMul a (ratAdd b c)) (ratAdd
+  (ratMul a b) (ratMul a c)) :=
+  fun a b c => ratRepEq (ratMul a (ratAdd b c)) (ratAdd (ratMul a b) (ratMul a c)) (intAdd
+    (intMul (intMul (ratNum a) (ratNum b)) (intMul (pos (ratDen a)) (pos (ratDen c)))) (intMul
+    (intMul (ratNum a) (ratNum c)) (intMul (pos (ratDen a)) (pos (ratDen b))))) (mul (mul
+    (ratDen a) (ratDen b)) (mul (ratDen a) (ratDen c)))
+    (ratFieldNatMulNeZero (mul (ratDen a) (ratDen b)) (mul (ratDen a) (ratDen c))
+      (ratFieldNatMulNeZero (ratDen a) (ratDen b) (fun h => ratDenNeZero a h) (fun h =>
+      ratDenNeZero b h)) (ratFieldNatMulNeZero (ratDen a) (ratDen c) (fun h => ratDenNeZero a h)
+      (fun h => ratDenNeZero c h)))
+    (ratRepCast (ratMul a (ratAdd b c)) (intMul (intMul (ratNum a) (intAdd (intMul (ratNum b)
+      (pos (ratDen c))) (intMul (ratNum c) (pos (ratDen b))))) (pos (ratDen a))) (intAdd (intMul
+      (intMul (ratNum a) (ratNum b)) (intMul (pos (ratDen a)) (pos (ratDen c)))) (intMul (intMul
+      (ratNum a) (ratNum c)) (intMul (pos (ratDen a)) (pos (ratDen b))))) (mul (mul (ratDen a)
+      (mul (ratDen b) (ratDen c))) (ratDen a)) (mul (mul (ratDen a) (ratDen b)) (mul (ratDen a)
+      (ratDen c)))
+      (ratFieldMulAddNum (ratNum a) (ratNum b) (ratNum c) (pos (ratDen a)) (pos (ratDen b)) (pos
+        (ratDen c)))
+      (trans0 Nat (mul (mul (ratDen a) (mul (ratDen b) (ratDen c))) (ratDen a)) (mul (ratDen a)
+        (mul (ratDen a) (mul (ratDen b) (ratDen c)))) (mul (mul (ratDen a) (ratDen b)) (mul
+        (ratDen a) (ratDen c)))
+  (trans0 Nat (mul (mul (ratDen a) (mul (ratDen b) (ratDen c))) (ratDen a)) (mul (ratDen a) (mul
+    (mul (ratDen b) (ratDen c)) (ratDen a))) (mul (ratDen a) (mul (ratDen a) (mul (ratDen b)
+    (ratDen c))))
+  (mulAssoc (ratDen a) (mul (ratDen b) (ratDen c)) (ratDen a))
+  (cong0 Nat Nat (mul (mul (ratDen b) (ratDen c)) (ratDen a)) (mul (ratDen a) (mul (ratDen b)
+    (ratDen c))) (fun qv => (mul (ratDen a) qv))
+  (trans0 Nat (mul (mul (ratDen b) (ratDen c)) (ratDen a)) (mul (ratDen b) (mul (ratDen a)
+    (ratDen c))) (mul (ratDen a) (mul (ratDen b) (ratDen c)))
+  (trans0 Nat (mul (mul (ratDen b) (ratDen c)) (ratDen a)) (mul (ratDen b) (mul (ratDen c)
+    (ratDen a))) (mul (ratDen b) (mul (ratDen a) (ratDen c)))
+  (mulAssoc (ratDen b) (ratDen c) (ratDen a))
+  (cong0 Nat Nat (mul (ratDen c) (ratDen a)) (mul (ratDen a) (ratDen c)) (fun qv => (mul (ratDen
+    b) qv))
+  (mulComm (ratDen c) (ratDen a))))
+  (trans0 Nat (mul (ratDen b) (mul (ratDen a) (ratDen c))) (mul (mul (ratDen a) (ratDen b))
+    (ratDen c)) (mul (ratDen a) (mul (ratDen b) (ratDen c)))
+  (trans0 Nat (mul (ratDen b) (mul (ratDen a) (ratDen c))) (mul (mul (ratDen b) (ratDen a))
+    (ratDen c)) (mul (mul (ratDen a) (ratDen b)) (ratDen c))
+  (sym0 Nat (mul (mul (ratDen b) (ratDen a)) (ratDen c)) (mul (ratDen b) (mul (ratDen a) (ratDen
+    c))) (mulAssoc (ratDen b) (ratDen a) (ratDen c)))
+  (cong0 Nat Nat (mul (ratDen b) (ratDen a)) (mul (ratDen a) (ratDen b)) (fun qv => (mul qv
+    (ratDen c)))
+  (mulComm (ratDen b) (ratDen a))))
+  (mulAssoc (ratDen a) (ratDen b) (ratDen c))))))
+  (sym0 Nat (mul (mul (ratDen a) (ratDen b)) (mul (ratDen a) (ratDen c))) (mul (ratDen a) (mul
+    (ratDen a) (mul (ratDen b) (ratDen c)))) (trans0 Nat (mul (mul (ratDen a) (ratDen b)) (mul
+    (ratDen a) (ratDen c))) (mul (ratDen a) (mul (ratDen b) (mul (ratDen a) (ratDen c)))) (mul
+    (ratDen a) (mul (ratDen a) (mul (ratDen b) (ratDen c))))
+  (mulAssoc (ratDen a) (ratDen b) (mul (ratDen a) (ratDen c)))
+  (cong0 Nat Nat (mul (ratDen b) (mul (ratDen a) (ratDen c))) (mul (ratDen a) (mul (ratDen b)
+    (ratDen c))) (fun qv => (mul (ratDen a) qv))
+  (trans0 Nat (mul (ratDen b) (mul (ratDen a) (ratDen c))) (mul (mul (ratDen a) (ratDen b))
+    (ratDen c)) (mul (ratDen a) (mul (ratDen b) (ratDen c)))
+  (trans0 Nat (mul (ratDen b) (mul (ratDen a) (ratDen c))) (mul (mul (ratDen b) (ratDen a))
+    (ratDen c)) (mul (mul (ratDen a) (ratDen b)) (ratDen c))
+  (sym0 Nat (mul (mul (ratDen b) (ratDen a)) (ratDen c)) (mul (ratDen b) (mul (ratDen a) (ratDen
+    c))) (mulAssoc (ratDen b) (ratDen a) (ratDen c)))
+  (cong0 Nat Nat (mul (ratDen b) (ratDen a)) (mul (ratDen a) (ratDen b)) (fun qv => (mul qv
+    (ratDen c)))
+  (mulComm (ratDen b) (ratDen a))))
+  (mulAssoc (ratDen a) (ratDen b) (ratDen c)))))))
+      (ratRepScale (ratMul a (ratAdd b c)) (intMul (ratNum a) (intAdd (intMul (ratNum b) (pos
+        (ratDen c))) (intMul (ratNum c) (pos (ratDen b))))) (mul (ratDen a) (mul (ratDen b)
+        (ratDen c))) (ratDen a) (ratMulRep a (ratAdd b c) (ratNum a) (intAdd (intMul (ratNum b)
+        (pos (ratDen c))) (intMul (ratNum c) (pos (ratDen b)))) (ratDen a) (mul (ratDen b)
+        (ratDen c))
+    (ratRepSelf a)
+    (ratAddRep b c (ratNum b) (ratNum c) (ratDen b) (ratDen c)
+    (ratRepSelf b)
+    (ratRepSelf c)))))
+    (ratAddRep (ratMul a b) (ratMul a c) (intMul (ratNum a) (ratNum b)) (intMul (ratNum a)
+      (ratNum c)) (mul (ratDen a) (ratDen b)) (mul (ratDen a) (ratDen c))
+    (ratMulRep a b (ratNum a) (ratNum b) (ratDen a) (ratDen b)
+    (ratRepSelf a)
+    (ratRepSelf b))
+    (ratMulRep a c (ratNum a) (ratNum c) (ratDen a) (ratDen c)
+    (ratRepSelf a)
+    (ratRepSelf c)))
+
+def ratMulInvCancel : (a : Rat) -> (0 ha : (0 e : Eq Rat a ratZero) -> Empty) ->
+    Eq Rat (ratMul a (ratInv a)) ratOne :=
+  fun a ha => ratRepCrossEq (ratMul a (ratInv a)) ratOne
+    (intMul (ratNum a) (ratNum (ratInv a))) intOne (mul (ratDen a) (ratDen (ratInv a))) one
+    (ratFieldNatMulNeZero (ratDen a) (ratDen (ratInv a)) (fun h => ratDenNeZero a h) (fun h =>
+      ratDenNeZero (ratInv a) h)) (fun h => zeroNeOne (sym0 Nat one zero h))
+    (ratMulRep a (ratInv a) (ratNum a) (ratNum (ratInv a)) (ratDen a) (ratDen (ratInv a))
+    (ratRepSelf a)
+    (ratRepSelf (ratInv a))) (ratRepSelf ratOne)
+    (trans0 Int (intMul (intMul (ratNum a) (ratNum (ratInv a))) intOne) (intMul (intMul (pos
+      (ratDen a)) (pos (ratDen (ratInv a)))) intOne) (intMul intOne (intMul (pos (ratDen a))
+      (pos (ratDen (ratInv a)))))
+  (cong0 Int Int (intMul (ratNum a) (ratNum (ratInv a))) (intMul (pos (ratDen a)) (pos (ratDen
+    (ratInv a)))) (fun qv => (intMul qv intOne))
+  (ratInvCross a ha))
+  (trans0 Int (intMul (intMul (pos (ratDen a)) (pos (ratDen (ratInv a)))) intOne) (intMul (pos
+    (ratDen (ratInv a))) (pos (ratDen a))) (intMul intOne (intMul (pos (ratDen a)) (pos (ratDen
+    (ratInv a)))))
+  (trans0 Int (intMul (intMul (pos (ratDen a)) (pos (ratDen (ratInv a)))) intOne) (intMul
+    (intMul (pos (ratDen (ratInv a))) (pos (ratDen a))) intOne) (intMul (pos (ratDen (ratInv
+    a))) (pos (ratDen a)))
+  (cong0 Int Int (intMul (pos (ratDen a)) (pos (ratDen (ratInv a)))) (intMul (pos (ratDen
+    (ratInv a))) (pos (ratDen a))) (fun qv => (intMul qv intOne))
+  (intMulComm (pos (ratDen a)) (pos (ratDen (ratInv a)))))
+  (intMulOne (intMul (pos (ratDen (ratInv a))) (pos (ratDen a)))))
+  (sym0 Int (intMul intOne (intMul (pos (ratDen a)) (pos (ratDen (ratInv a))))) (intMul (pos
+    (ratDen (ratInv a))) (pos (ratDen a))) (trans0 Int (intMul intOne (intMul (pos (ratDen a))
+    (pos (ratDen (ratInv a))))) (intMul intOne (intMul (pos (ratDen (ratInv a))) (pos (ratDen
+    a)))) (intMul (pos (ratDen (ratInv a))) (pos (ratDen a)))
+  (cong0 Int Int (intMul (pos (ratDen a)) (pos (ratDen (ratInv a)))) (intMul (pos (ratDen
+    (ratInv a))) (pos (ratDen a))) (fun qv => (intMul intOne qv))
+  (intMulComm (pos (ratDen a)) (pos (ratDen (ratInv a)))))
+  (ratFieldIntOneMul (intMul (pos (ratDen (ratInv a))) (pos (ratDen a))))))))
+
+check ratFieldIntOneMul
+check ratFieldIntAddMul
+check ratFieldMulSwap
+check ratFieldMulRotate
+check ratFieldAddRepCore
+check ratFieldMulRepCore
+check ratAddRep
+check ratMulRep
+check ratFieldNatMulNeZero
+check ratRepZero
+check ratRepCast
+check ratFieldScaleCore
+check ratRepScale
+check ratFieldNatOneMul
+check ratFieldAddAssocNum
+check ratFieldMulAddNum
+check ratAddComm
+check ratAddAssoc
+check ratAddZero
+check ratAddNegCancel
+check ratMulComm
+check ratMulAssoc
+check ratMulOne
+check ratMulAdd
+check ratMulInvCancel

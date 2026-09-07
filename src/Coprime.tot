@@ -1,0 +1,81 @@
+-- Euclid's lemma and uniqueness of coprime cross-product denominators.
+-- Every common divisor of scaled inputs divides their scaled gcd.
+-- This closure also holds for exhausted fuel, whose result is zero.
+
+def natDvdMulOfDvdAddMul : (k : Nat) -> (a : Nat) -> (b : Nat) ->
+    (c : Nat) -> (t : Nat) -> Eq Nat (add a b) c ->
+    NatDvd k (mul a t) -> NatDvd k (mul c t) -> NatDvd k (mul b t) :=
+  fun k a b c t e ha hc => natDvdOfDvdAdd k (mul a t) (mul b t) ha
+    (natDvdTransport k (mul c t) (add (mul a t) (mul b t))
+      (trans0 Nat (mul c t) (mul (add a b) t) (add (mul a t) (mul b t))
+        (cong0 Nat Nat c (add a b) (fun z => mul z t)
+          (sym0 Nat (add a b) c e))
+        (addMulRight a b t)) hc)
+
+def gcdStepDvdMul : (p : Nat) -> (q : Nat) -> (k : Nat) -> (t : Nat) ->
+    (next : Nat -> Nat -> Nat) ->
+    ((a : Nat) -> (b : Nat) -> NatDvd k (mul a t) -> NatDvd k (mul b t) ->
+      NatDvd k (mul (next a b) t)) ->
+    NatDvd k (mul (succ p) t) -> NatDvd k (mul (succ q) t) ->
+    (c : GcdCompare (succ p) (succ q)) ->
+    NatDvd k (mul (gcdCompareStep (succ p) (succ q) c next) t) :=
+  fun p q k t next ih ha hb c => match c as w return
+      NatDvd k (mul (gcdCompareStep (succ p) (succ q) w next) t) with
+    | gcdLess n e => ih (succ p) (succ n) ha
+        (natDvdMulOfDvdAddMul k (succ p) (succ n) (succ q) t e ha hb)
+    | gcdSame e => ha
+    | gcdGreater n e => ih (succ n) (succ q)
+        (natDvdMulOfDvdAddMul k (succ q) (succ n) (succ p) t e hb ha) hb
+    end
+
+def rec gcdFuelDvdMul : (fuel : Nat) -> (a : Nat) -> (b : Nat) ->
+    (k : Nat) -> (t : Nat) -> NatDvd k (mul a t) -> NatDvd k (mul b t) ->
+    NatDvd k (mul (gcdFuel fuel a b) t) :=
+  fun fuel => match fuel as f return (a : Nat) -> (b : Nat) ->
+      (k : Nat) -> (t : Nat) -> NatDvd k (mul a t) -> NatDvd k (mul b t) ->
+      NatDvd k (mul (gcdFuel f a b) t) with
+    | zero => fun a b k t ha hb => natDvdZero k
+    | succ f => fun a b k t => match a as x return
+        NatDvd k (mul x t) -> NatDvd k (mul b t) ->
+        NatDvd k (mul (gcdFuel (succ f) x b) t) with
+        | zero => fun ha hb => hb
+        | succ p => match b as y return
+            NatDvd k (mul (succ p) t) -> NatDvd k (mul y t) ->
+            NatDvd k (mul (gcdFuel (succ f) (succ p) y) t) with
+            | zero => fun ha hb => ha
+            | succ q => fun ha hb => gcdStepDvdMul p q k t (gcdFuel f)
+                (fun x y hx hy => gcdFuelDvdMul f x y k t hx hy)
+                ha hb (gcdCompare (succ p) (succ q))
+            end
+        end
+    end
+
+def gcdDvdMul : (a : Nat) -> (b : Nat) -> (k : Nat) -> (t : Nat) ->
+    NatDvd k (mul a t) -> NatDvd k (mul b t) -> NatDvd k (mul (gcd a b) t) :=
+  fun a b k t ha hb => gcdFuelDvdMul (succ (add a b)) a b k t ha hb
+
+def natCoprimeDvdMul : (a : Nat) -> (b : Nat) -> (d : Nat) ->
+    Eq Nat (gcd a b) one -> NatDvd b (mul a d) -> NatDvd b d :=
+  fun a b d h hd => natDvdTransport b (mul (gcd a b) d) d
+    (trans0 Nat (mul (gcd a b) d) (mul one d) d
+      (cong0 Nat Nat (gcd a b) one (fun z => mul z d) h) (addZero d))
+    (gcdDvdMul a b b d hd (dvdWitness b (mul b d) d (refl Nat (mul b d))))
+
+def natCoprimeCrossDen : (a : Nat) -> (b : Nat) -> (c : Nat) -> (d : Nat) ->
+    Eq Nat (gcd a b) one -> Eq Nat (gcd c d) one ->
+    Eq Nat (mul a d) (mul c b) -> Eq Nat b d :=
+  fun a b c d hab hcd e => natDvdAntisymm b d
+    (natCoprimeDvdMul a b d hab
+      (natDvdTransport b (mul c b) (mul a d)
+        (sym0 Nat (mul a d) (mul c b) e)
+        (dvdWitness b (mul c b) c (mulComm b c))))
+    (natCoprimeDvdMul c d b hcd
+      (natDvdTransport d (mul a d) (mul c b) e
+        (dvdWitness d (mul a d) a (mulComm d a))))
+
+check natDvdMulOfDvdAddMul
+check gcdStepDvdMul
+check gcdFuelDvdMul
+check gcdDvdMul
+check natCoprimeDvdMul
+check natCoprimeCrossDen

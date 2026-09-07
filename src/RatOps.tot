@@ -1,0 +1,175 @@
+-- Canonical rational arithmetic. Each operation computes through normalization;
+-- its value theorem states the corresponding unreduced fraction equality.
+
+def ratDenMulNeZero : (a : Rat) -> (b : Rat) ->
+    Eq Nat (mul (ratDen a) (ratDen b)) zero -> Empty :=
+  fun a b h => ratDenNeZero b
+    (natMulEqZeroRight (ratDen a) (ratDen b) (fun e => ratDenNeZero a e) h)
+
+reducible def ratAdd : Rat -> Rat -> Rat :=
+  fun a b => ratNormalize
+    (intAdd (intMul (ratNum a) (pos (ratDen b)))
+      (intMul (ratNum b) (pos (ratDen a))))
+    (pred (mul (ratDen a) (ratDen b)))
+
+reducible def ratMul : Rat -> Rat -> Rat :=
+  fun a b => ratNormalize (intMul (ratNum a) (ratNum b))
+    (pred (mul (ratDen a) (ratDen b)))
+
+reducible def ratNeg : Rat -> Rat :=
+  fun a => ratNormalize (intNeg (ratNum a)) (ratDenPred a)
+
+reducible def ratSub : Rat -> Rat -> Rat :=
+  fun a b => ratAdd a (ratNeg b)
+
+-- The reciprocal is total: zero maps to zero. Splitting the numerator's
+-- sign keeps the denominator positive and never examines a proof term.
+reducible def ratInvNum : Int -> Nat -> Rat :=
+  fun n d => match n with
+    | pos a => match a with
+        | zero => ratZero
+        | succ p => ratNormalize (pos d) p
+        end
+    | negsucc p => ratNormalize (intNeg (pos d)) p
+    end
+
+reducible def ratInv : Rat -> Rat :=
+  fun a => ratInvNum (ratNum a) (ratDen a)
+
+reducible def ratDiv : Rat -> Rat -> Rat :=
+  fun a b => ratMul a (ratInv b)
+
+def ratAddValue : (a : Rat) -> (b : Rat) ->
+    ratRep (ratAdd a b)
+      (intAdd (intMul (ratNum a) (pos (ratDen b)))
+        (intMul (ratNum b) (pos (ratDen a))))
+      (mul (ratDen a) (ratDen b)) :=
+  fun a b => ratRepNormalize
+    (intAdd (intMul (ratNum a) (pos (ratDen b)))
+      (intMul (ratNum b) (pos (ratDen a))))
+    (mul (ratDen a) (ratDen b)) (ratDenMulNeZero a b)
+
+def ratMulValue : (a : Rat) -> (b : Rat) ->
+    ratRep (ratMul a b) (intMul (ratNum a) (ratNum b))
+      (mul (ratDen a) (ratDen b)) :=
+  fun a b => ratRepNormalize (intMul (ratNum a) (ratNum b))
+    (mul (ratDen a) (ratDen b)) (ratDenMulNeZero a b)
+
+def ratNegValue : (a : Rat) ->
+    ratRep (ratNeg a) (intNeg (ratNum a)) (ratDen a) :=
+  fun a => ratRepNormalize (intNeg (ratNum a)) (ratDen a)
+    (fun e => ratDenNeZero a e)
+
+def ratSubEqAddNeg : (a : Rat) -> (b : Rat) ->
+    Eq Rat (ratSub a b) (ratAdd a (ratNeg b)) :=
+  fun a b => refl Rat (ratAdd a (ratNeg b))
+
+def ratDivEqMulInv : (a : Rat) -> (b : Rat) ->
+    Eq Rat (ratDiv a b) (ratMul a (ratInv b)) :=
+  fun a b => refl Rat (ratMul a (ratInv b))
+
+def intNegNeg : (a : Int) -> Eq Int (intNeg (intNeg a)) a :=
+  fun a => match a as x return Eq Int (intNeg (intNeg x)) x with
+    | pos n => match n as m return Eq Int (intNeg (intNeg (pos m))) (pos m) with
+        | zero => refl Int intZero
+        | succ p => refl Int (pos (succ p))
+        end
+    | negsucc p => refl Int (negsucc p)
+    end
+
+def intNegMul : (a : Int) -> (b : Int) ->
+    Eq Int (intMul (intNeg a) b) (intNeg (intMul a b)) :=
+  fun a b => trans0 Int (intMul (intNeg a) b) (intMul b (intNeg a))
+    (intNeg (intMul a b)) (intMulComm (intNeg a) b)
+    (trans0 Int (intMul b (intNeg a)) (intNeg (intMul b a))
+      (intNeg (intMul a b)) (intMulNeg b a)
+      (cong0 Int Int (intMul b a) (intMul a b) intNeg (intMulComm b a)))
+
+def ratNumZeroEq : (a : Rat) -> (0 h : Eq Int (ratNum a) intZero) ->
+    Eq Rat a ratZero :=
+  fun a h => ratExt a ratZero h
+    (trans0 Nat (ratDen a) (gcd zero (ratDen a)) one
+      (sym0 Nat (gcd zero (ratDen a)) (ratDen a) (gcdZeroLeft (ratDen a)))
+      (trans0 Nat (gcd zero (ratDen a)) (gcd (natAbs (ratNum a)) (ratDen a)) one
+        (cong0 Int Nat intZero (ratNum a) (fun z => gcd (natAbs z) (ratDen a))
+          (sym0 Int (ratNum a) intZero h))
+        (ratReduced a)))
+
+def ratNumNeZero : (a : Rat) ->
+    (ha : (0 e : Eq Rat a ratZero) -> Empty) ->
+    (0 h : Eq Int (ratNum a) intZero) -> Empty :=
+  fun a ha h => ha (ratNumZeroEq a h)
+
+def ratInvNumCross : (n : Int) -> (d : Nat) ->
+    (0 hn : (0 e : Eq Int n intZero) -> Empty) ->
+    Eq Int (intMul n (ratNum (ratInvNum n d)))
+      (pos (mul d (ratDen (ratInvNum n d)))) :=
+  fun n d => match n as x return
+      (0 hx : (0 e : Eq Int x intZero) -> Empty) ->
+      Eq Int (intMul x (ratNum (ratInvNum x d)))
+        (pos (mul d (ratDen (ratInvNum x d)))) with
+    | pos a => match a as m return
+        (0 hm : (0 e : Eq Int (pos m) intZero) -> Empty) ->
+        Eq Int (intMul (pos m) (ratNum (ratInvNum (pos m) d)))
+          (pos (mul d (ratDen (ratInvNum (pos m) d)))) with
+        | zero => fun hm => match hm (refl Int intZero) as impossible return
+            Eq Int (intMul intZero (ratNum ratZero))
+              (pos (mul d (ratDen ratZero))) with end
+        | succ p => fun hm => ratNormalizeValue (pos d) p
+        end
+    | negsucc p => fun hx => trans0 Int
+        (intMul (negsucc p) (ratNum (ratNormalize (intNeg (pos d)) p)))
+        (intNeg (intMul (pos (succ p))
+          (ratNum (ratNormalize (intNeg (pos d)) p))))
+        (pos (mul d (ratDen (ratNormalize (intNeg (pos d)) p))))
+        (intNegMul (pos (succ p)) (ratNum (ratNormalize (intNeg (pos d)) p)))
+        (trans0 Int
+          (intNeg (intMul (pos (succ p))
+            (ratNum (ratNormalize (intNeg (pos d)) p))))
+          (intNeg (intMul (intNeg (pos d))
+            (pos (ratDen (ratNormalize (intNeg (pos d)) p)))))
+          (pos (mul d (ratDen (ratNormalize (intNeg (pos d)) p))))
+          (cong0 Int Int
+            (intMul (pos (succ p)) (ratNum (ratNormalize (intNeg (pos d)) p)))
+            (intMul (intNeg (pos d)) (pos (ratDen (ratNormalize (intNeg (pos d)) p))))
+            intNeg (ratNormalizeValue (intNeg (pos d)) p))
+          (trans0 Int
+            (intNeg (intMul (intNeg (pos d))
+              (pos (ratDen (ratNormalize (intNeg (pos d)) p)))))
+            (intNeg (intNeg (pos (mul d (ratDen (ratNormalize (intNeg (pos d)) p))))))
+            (pos (mul d (ratDen (ratNormalize (intNeg (pos d)) p))))
+            (cong0 Int Int
+              (intMul (intNeg (pos d)) (pos (ratDen (ratNormalize (intNeg (pos d)) p))))
+              (intNeg (pos (mul d (ratDen (ratNormalize (intNeg (pos d)) p)))))
+              intNeg (intNegMul (pos d) (pos (ratDen (ratNormalize (intNeg (pos d)) p)))))
+            (intNegNeg (pos (mul d (ratDen (ratNormalize (intNeg (pos d)) p)))))))
+    end
+
+def ratInvCross : (a : Rat) ->
+    (0 ha : (0 e : Eq Rat a ratZero) -> Empty) ->
+    Eq Int (intMul (ratNum a) (ratNum (ratInv a)))
+      (pos (mul (ratDen a) (ratDen (ratInv a)))) :=
+  fun a ha => ratInvNumCross (ratNum a) (ratDen a) (ratNumNeZero a ha)
+
+def ratInvZero : Eq Rat (ratInv ratZero) ratZero := refl Rat ratZero
+
+check ratDenMulNeZero
+check ratAdd
+check ratMul
+check ratNeg
+check ratSub
+check ratInvNum
+check ratInv
+check ratDiv
+check ratAddValue
+check ratMulValue
+check ratNegValue
+check ratSubEqAddNeg
+check ratDivEqMulInv
+check intNegNeg
+check intNegMul
+check ratNumZeroEq
+check ratNumNeZero
+check ratInvNumCross
+check ratInvCross
+check ratInvZero

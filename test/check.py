@@ -16,7 +16,7 @@ TOT = Path(os.environ.get("TOT", DEFAULT_TOT))
 NAMES = ["Foundation", "Field", "Invariant", "Axioms", "Ring", "Laws",
          "Compose", "Frac", "Order", "Pool", "Basic", "Product", "NoDrain",
          "PriceImpact", "Liquidity", "Nat", "Int", "Gcd", "Div", "Reduce",
-         "Rat", "RatNormalize"]
+         "Rat", "RatNormalize", "Coprime", "RatEq", "RatOps", "RatField"]
 FILES = {name: (ROOT / "src" / f"{name}.tot").read_text() for name in NAMES}
 FIELD = FILES["Field"]
 INVARIANT = FILES["Invariant"]
@@ -1235,6 +1235,254 @@ CASES += [(name, mutate_header(file_name, def_name, old, new), "mismatch")
      "  rat intZero one (refl Nat one)\ncheck invalidRatZeroReduced\n", "mismatch"),
 ]
 
+# Coprime cancellation, canonical equality and arithmetic retain their
+# actual proofs while the promised result or one necessary premise changes.
+COPRIME_NEGATIVES = [
+    ("wrong-coprime-difference", "natDvdMulOfDvdAddMul", "NatDvd k (mul b t) :=", "NatDvd k b :="),
+    ("wrong-coprime-step", "gcdStepDvdMul", "NatDvd k (mul (gcdCompareStep (succ p) (succ q) c next) t) :=", "NatDvd k t :="),
+    ("wrong-coprime-fuel", "gcdFuelDvdMul", "NatDvd k (mul (gcdFuel fuel a b) t) :=", "NatDvd k t :="),
+    ("wrong-coprime-gcd", "gcdDvdMul", "NatDvd k (mul (gcd a b) t) :=", "NatDvd k t :="),
+    ("wrong-coprime-cancel", "natCoprimeDvdMul", "NatDvd b d :=", "NatDvd b (succ d) :="),
+    ("weak-coprime-cancel", "natCoprimeDvdMul", "Eq Nat (gcd a b) one", "Eq Nat (gcd a b) (gcd a b)"),
+    ("wrong-coprime-den", "natCoprimeCrossDen", "Eq Nat b d :=", "Eq Nat b (succ d) :="),
+    ("weak-coprime-left", "natCoprimeCrossDen", "Eq Nat (gcd a b) one", "Eq Nat (gcd a b) (gcd a b)"),
+    ("weak-coprime-right", "natCoprimeCrossDen", "Eq Nat (gcd c d) one", "Eq Nat (gcd c d) (gcd c d)"),
+    ("weak-coprime-cross", "natCoprimeCrossDen", "Eq Nat (mul a d) (mul c b)", "Eq Nat (mul a d) (mul a d)"),
+]
+
+RAT_EQ_NEGATIVES = [
+    ("wrong-rat-cross-abs", "ratEqCrossAbs", "(mul (natAbs c) b) :=", "(mul (natAbs c) d) :="),
+    ("wrong-rat-cross-den", "ratCrossDenEq", "Eq Nat (ratDen r) (ratDen s) :=", "Eq Nat (ratDen r) one :="),
+    ("wrong-rat-cross-num", "ratCrossNumEq", "Eq Int (ratNum r) (ratNum s) :=", "Eq Int (ratNum r) intZero :="),
+    ("wrong-rat-cross-eq", "ratCrossEq", "Eq Rat r s :=", "Eq Rat r ratZero :="),
+    ("weak-rat-cross-eq", "ratCrossEq", "(intMul (ratNum s) (pos (ratDen r))))", "(intMul (ratNum r) (pos (ratDen s))))"),
+    ("wrong-rat-rep-self", "ratRepSelf", "ratRep r (ratNum r) (ratDen r) :=", "ratRep r intZero (ratDen r) :="),
+    ("wrong-rat-rep-normalize", "ratRepNormalize", "n d :=", "n one :="),
+    ("wrong-rat-mul-front", "ratEqMulFront", "(intMul (intMul b a) c) :=", "(intMul b a) :="),
+    ("wrong-rat-mul-tail", "ratEqMulTail", "(intMul (intMul a c) b) :=", "(intMul a c) :="),
+    ("wrong-rat-shared-cross", "ratEqSharedCross", "Eq Int (intMul a d) (intMul c b) :=", "Eq Int (intMul a d) (intMul c d) :="),
+    ("wrong-rat-rep-eq", "ratRepEq", "Eq Rat r s :=", "Eq Rat r ratZero :="),
+    ("weak-rat-rep-eq-den", "ratRepEq", "Eq Nat d zero -> Empty", "Eq Nat d one -> Empty"),
+    ("wrong-rat-rep-trans", "ratRepTrans", "ratRep r m e :=", "ratRep r m d :="),
+    ("weak-rat-rep-trans-den", "ratRepTrans", "Eq Nat d zero -> Empty", "Eq Nat d one -> Empty"),
+    ("wrong-rat-rep-cross-eq", "ratRepCrossEq", "Eq Rat r s :=", "Eq Rat r ratZero :="),
+    ("weak-rat-rep-cross-den", "ratRepCrossEq", "Eq Nat e zero -> Empty", "Eq Nat e one -> Empty"),
+]
+
+RAT_OPS_NEGATIVES = [
+    ("wrong-rat-den-product", "ratDenMulNeZero", "zero -> Empty :=", "one -> Empty :="),
+    ("wrong-rat-add-value", "ratAddValue", "(mul (ratDen a) (ratDen b)) :=", "(ratDen a) :="),
+    ("wrong-rat-mul-value", "ratMulValue", "(mul (ratDen a) (ratDen b)) :=", "(ratDen b) :="),
+    ("wrong-rat-neg-value", "ratNegValue", "(intNeg (ratNum a))", "(ratNum a)"),
+    ("wrong-rat-sub-definition", "ratSubEqAddNeg", "(ratAdd a (ratNeg b)) :=", "(ratAdd a b) :="),
+    ("wrong-rat-div-definition", "ratDivEqMulInv", "(ratMul a (ratInv b)) :=", "(ratMul a b) :="),
+    ("wrong-int-double-neg", "intNegNeg", "a :=", "intZero :="),
+    ("wrong-int-neg-mul", "intNegMul", "(intNeg (intMul a b)) :=", "(intMul a b) :="),
+    ("wrong-rat-num-zero", "ratNumZeroEq", "Eq Rat a ratZero :=", "Eq Rat a ratOne :="),
+    ("weak-rat-num-nonzero", "ratNumNeZero", "Eq Rat a ratZero", "Eq Rat a ratOne"),
+    ("wrong-rat-inv-num-cross", "ratInvNumCross", "(pos (mul d (ratDen (ratInvNum n d)))) :=", "intZero :="),
+    ("wrong-rat-inv-cross", "ratInvCross", "(pos (mul (ratDen a) (ratDen (ratInv a)))) :=", "intZero :="),
+    ("weak-rat-inv-cross", "ratInvCross", "Eq Rat a ratZero", "Eq Rat a ratOne"),
+    ("wrong-rat-inv-zero", "ratInvZero", "ratZero :=", "ratOne :="),
+]
+
+RAT_FIELD_NEGATIVES = [
+    ("wrong-rat-field-int-one", "ratFieldIntOneMul", "a :=", "intZero :="),
+    ("wrong-rat-field-int-distrib", "ratFieldIntAddMul", "(intAdd (intMul a c) (intMul b c)) :=", "(intAdd a b) :="),
+    ("wrong-rat-field-mul-swap", "ratFieldMulSwap", "(intMul (intMul a d) (intMul b e)) :=", "(intMul a d) :="),
+    ("wrong-rat-field-mul-rotate", "ratFieldMulRotate", "(intMul (intMul a e) (intMul b d)) :=", "(intMul a e) :="),
+    ("wrong-rat-field-add-assoc-num", "ratFieldAddAssocNum", "(intMul (intAdd (intMul b z) (intMul c y)) x)) :=", "(intMul (intAdd (intMul b z) (intMul c y)) z)) :="),
+    ("wrong-rat-field-mul-add-num", "ratFieldMulAddNum", "(intMul (intMul a c) (intMul x y))) :=", "(intMul a c)) :="),
+    ("wrong-rat-add-rep-core", "ratFieldAddRepCore", "(intMul (intAdd (intMul n e) (intMul m d)) s) :=", "(intMul (intAdd n m) s) :="),
+    ("wrong-rat-mul-rep-core", "ratFieldMulRepCore", "(intMul (intMul n m) s) :=", "(intMul n s) :="),
+    ("wrong-rat-add-rep", "ratAddRep", "(mul d e) :=", "d :="),
+    ("wrong-rat-mul-rep", "ratMulRep", "(mul d e) :=", "e :="),
+    ("wrong-rat-field-product-nonzero", "ratFieldNatMulNeZero", "Eq Nat (mul a b) zero", "Eq Nat (mul a b) one"),
+    ("wrong-rat-rep-zero", "ratRepZero", "ratRep ratZero intZero d :=", "ratRep ratZero intOne d :="),
+    ("wrong-rat-rep-cast", "ratRepCast", "ratRep r m e :=", "ratRep r m d :="),
+    ("wrong-rat-scale-core", "ratFieldScaleCore", "(intMul (intMul b k) c) :=", "(intMul b c) :="),
+    ("wrong-rat-rep-scale", "ratRepScale", "(mul d k) :=", "d :="),
+    ("wrong-rat-field-nat-one", "ratFieldNatOneMul", "a :=", "zero :="),
+    ("wrong-rat-add-comm", "ratAddComm", "(ratAdd b a) :=", "a :="),
+    ("wrong-rat-add-assoc", "ratAddAssoc", "(ratAdd a (ratAdd b c)) :=", "(ratAdd a b) :="),
+    ("wrong-rat-add-zero", "ratAddZero", "a :=", "ratZero :="),
+    ("wrong-rat-add-neg-cancel", "ratAddNegCancel", "ratZero :=", "ratOne :="),
+    ("wrong-rat-mul-comm", "ratMulComm", "(ratMul b a) :=", "a :="),
+    ("wrong-rat-mul-assoc", "ratMulAssoc", "(ratMul a (ratMul b c)) :=", "(ratMul a b) :="),
+    ("wrong-rat-mul-one", "ratMulOne", "a :=", "ratOne :="),
+    ("wrong-rat-mul-add", "ratMulAdd", "(ratAdd (ratMul a b) (ratMul a c)) :=", "(ratAdd b c) :="),
+    ("wrong-rat-mul-inv-cancel", "ratMulInvCancel", "ratOne :=", "ratZero :="),
+    ("weak-rat-mul-inv-cancel", "ratMulInvCancel", "Eq Rat a ratZero", "Eq Rat a ratOne"),
+]
+
+# These aliases freeze the field-law types. The reciprocal cancellation
+# hypothesis and its equality argument must both remain erased.
+RAT_FIELD_SHAPES = """
+def ratAddCommShape : (a : Rat) -> (b : Rat) -> Eq Rat (ratAdd a b) (ratAdd b a) := ratAddComm
+def ratAddAssocShape : (a : Rat) -> (b : Rat) -> (c : Rat) ->
+    Eq Rat (ratAdd (ratAdd a b) c) (ratAdd a (ratAdd b c)) := ratAddAssoc
+def ratAddZeroShape : (a : Rat) -> Eq Rat (ratAdd a ratZero) a := ratAddZero
+def ratAddNegCancelShape : (a : Rat) -> Eq Rat (ratAdd a (ratNeg a)) ratZero := ratAddNegCancel
+def ratMulCommShape : (a : Rat) -> (b : Rat) -> Eq Rat (ratMul a b) (ratMul b a) := ratMulComm
+def ratMulAssocShape : (a : Rat) -> (b : Rat) -> (c : Rat) ->
+    Eq Rat (ratMul (ratMul a b) c) (ratMul a (ratMul b c)) := ratMulAssoc
+def ratMulOneShape : (a : Rat) -> Eq Rat (ratMul a ratOne) a := ratMulOne
+def ratMulAddShape : (a : Rat) -> (b : Rat) -> (c : Rat) ->
+    Eq Rat (ratMul a (ratAdd b c)) (ratAdd (ratMul a b) (ratMul a c)) := ratMulAdd
+def ratSubEqAddNegShape : (a : Rat) -> (b : Rat) ->
+    Eq Rat (ratSub a b) (ratAdd a (ratNeg b)) := ratSubEqAddNeg
+def ratDivEqMulInvShape : (a : Rat) -> (b : Rat) ->
+    Eq Rat (ratDiv a b) (ratMul a (ratInv b)) := ratDivEqMulInv
+def ratMulInvCancelShape : (a : Rat) -> (0 ha : (0 e : Eq Rat a ratZero) -> Empty) ->
+    Eq Rat (ratMul a (ratInv a)) ratOne := ratMulInvCancel
+def ratCrossEqShape : (r : Rat) -> (s : Rat) ->
+    (0 h : Eq Int (intMul (ratNum r) (pos (ratDen s)))
+      (intMul (ratNum s) (pos (ratDen r)))) -> Eq Rat r s := ratCrossEq
+def ratAddRepShape : (a : Rat) -> (b : Rat) -> (n : Int) -> (m : Int) -> (d : Nat) -> (e : Nat) ->
+    (0 ha : ratRep a n d) -> (0 hb : ratRep b m e) ->
+    ratRep (ratAdd a b) (intAdd (intMul n (pos e)) (intMul m (pos d))) (mul d e) := ratAddRep
+def ratMulRepShape : (a : Rat) -> (b : Rat) -> (n : Int) -> (m : Int) -> (d : Nat) -> (e : Nat) ->
+    (0 ha : ratRep a n d) -> (0 hb : ratRep b m e) ->
+    ratRep (ratMul a b) (intMul n m) (mul d e) := ratMulRep
+check ratAddCommShape
+check ratAddAssocShape
+check ratAddZeroShape
+check ratAddNegCancelShape
+check ratMulCommShape
+check ratMulAssocShape
+check ratMulOneShape
+check ratMulAddShape
+check ratSubEqAddNegShape
+check ratDivEqMulInvShape
+check ratMulInvCancelShape
+check ratCrossEqShape
+check ratAddRepShape
+check ratMulRepShape
+"""
+
+def rat_input(numerator, denominator):
+    return f"(ratNormalize {int_term(numerator)} {nat_term(denominator - 1)})"
+
+def rat_operation_claim(name, expression, projection, expected):
+    carrier, result = (("Int", int_term(expected)) if projection == "ratNum"
+                       else ("Nat", nat_term(expected)))
+    return (f"\ndef {name} : Eq {carrier} ({projection} {expression}) {result} :=\n"
+            f"  refl {carrier} {result}\ncheck {name}\n")
+
+def rat_operation_values(name, expression, expected):
+    return (rat_operation_claim(name + "Num", expression, "ratNum", expected.numerator)
+            + rat_operation_claim(name + "Den", expression, "ratDen", expected.denominator))
+
+# Raw inputs deliberately include unreduced fractions and zero with a
+# nonunit denominator. Each pair is checked against Python's Fraction.
+ARITHMETIC_INPUTS = [(-2, 1), (-2, 2), (-2, 3), (-1, 2), (0, 3),
+                     (1, 2), (2, 3), (2, 2), (2, 1)]
+ARITHMETIC_BINARY = [
+    ("Add", lambda a, b: a + b),
+    ("Mul", lambda a, b: a * b),
+    ("Sub", lambda a, b: a - b),
+    ("Div", lambda a, b: a / b if b else Fraction(0)),
+]
+ARITHMETIC_UNARY = [
+    ("Neg", lambda a: -a),
+    ("Inv", lambda a: 1 / a if a else Fraction(0)),
+]
+# Computation depends on the prefix through RatOps. The complete-source
+# baseline, all theorem mutations and field-shape checks still include
+# RatField; oracle groups avoid re-expanding its unrelated proof types.
+ARITHMETIC_BASE = "\n".join(FILES[name] for name in NAMES if name != "RatField")
+ARITHMETIC_CASES = []
+for operation, oracle in ARITHMETIC_BINARY:
+    claims = [rat_operation_values(
+        f"rat{operation}Oracle{i}x{j}",
+        f"(rat{operation} {rat_input(*a)} {rat_input(*b)})",
+        oracle(Fraction(*a), Fraction(*b)))
+        for i, a in enumerate(ARITHMETIC_INPUTS)
+        for j, b in enumerate(ARITHMETIC_INPUTS)]
+    for start in range(0, len(claims), 9):
+        ARITHMETIC_CASES.append((f"rat-{operation.lower()}-grid-{start // 9}",
+                                 ARITHMETIC_BASE + "".join(claims[start:start + 9]), None))
+for operation, oracle in ARITHMETIC_UNARY:
+    claims = [rat_operation_values(
+        f"rat{operation}Oracle{i}", f"(rat{operation} {rat_input(*a)})",
+        oracle(Fraction(*a))) for i, a in enumerate(ARITHMETIC_INPUTS)]
+    ARITHMETIC_CASES.append((f"rat-{operation.lower()}-grid", ARITHMETIC_BASE + "".join(claims), None))
+
+# Each operation has false numerator and denominator controls. Their
+# values come from the same independent oracle before being perturbed.
+ARITHMETIC_WRONG_CASES = []
+ARITHMETIC_FAILING_DEFS = {}
+for operation, oracle in ARITHMETIC_BINARY + ARITHMETIC_UNARY:
+    a, b = (-2, 3), (1, 2)
+    unary = operation in {"Neg", "Inv"}
+    expression = (f"(rat{operation} {rat_input(*a)})" if unary else
+                  f"(rat{operation} {rat_input(*a)} {rat_input(*b)})")
+    expected = oracle(Fraction(*a)) if unary else oracle(Fraction(*a), Fraction(*b))
+    for projection, value in [("ratNum", expected.numerator), ("ratDen", expected.denominator)]:
+        name = f"wrongRat{operation}{projection[3:]}"
+        case = f"wrong-rat-{operation.lower()}-{projection[3:].lower()}-computed"
+        ARITHMETIC_WRONG_CASES.append((case, ARITHMETIC_BASE + rat_operation_claim(
+            name, expression, projection, value + 1), "mismatch"))
+        ARITHMETIC_FAILING_DEFS[case] = name
+
+COPRIME_EXAMPLES = """
+def coprimeZeroNumerator : Eq Nat one one :=
+  natCoprimeCrossDen zero one zero one (refl Nat one) (refl Nat one) (refl Nat zero)
+def coprimeZeroDenominator : Eq Nat zero zero :=
+  natCoprimeCrossDen one zero one zero (refl Nat one) (refl Nat one) (refl Nat zero)
+def coprimeNontrivial : Eq Nat (succ (succ one)) (succ (succ one)) :=
+  natCoprimeCrossDen (succ one) (succ (succ one)) (succ one) (succ (succ one))
+    (refl Nat one) (refl Nat one) (refl Nat (mul (succ one) (succ (succ one))))
+check coprimeZeroNumerator
+check coprimeZeroDenominator
+check coprimeNontrivial
+"""
+
+M4D2_NEGATIVES = [(name, file_name, def_name, old, new)
+                  for file_name, negatives in [("Coprime", COPRIME_NEGATIVES),
+                                               ("RatEq", RAT_EQ_NEGATIVES),
+                                               ("RatOps", RAT_OPS_NEGATIVES),
+                                               ("RatField", RAT_FIELD_NEGATIVES)]
+                  for name, def_name, old, new in negatives]
+
+def mutate_wrapped_header(file_name, def_name, old, new):
+    """Require one header anchor while accepting changes to line wrapping."""
+    source = FILES[file_name]
+    start, _end = def_span(def_name, source, f"{file_name}.tot")
+    header = source[start:source.index(":=", start) + 2]
+    pattern = r"\s+".join(re.escape(word) for word in old.split())
+    if old == new or len(re.findall(pattern, header)) != 1:
+        raise SystemExit(f"wrapped header anchor must occur once in {file_name}.tot "
+                         f"def {def_name}: {old!r}")
+    changed = re.sub(pattern, lambda _match: new, header)
+    return mutate_in_def(file_name, def_name, header, changed)
+
+OPERATION_OPACITY = [
+    ("ratAdd", "ratAddValue"), ("ratMul", "ratMulValue"),
+    ("ratNeg", "ratNegValue"), ("ratSub", "ratSubEqAddNeg"),
+    ("ratInvNum", "ratInvNumCross"), ("ratInv", "ratInvCross"),
+    ("ratDiv", "ratDivEqMulInv"),
+]
+CASES += [(name, mutate_wrapped_header(file_name, def_name, old, new), "mismatch")
+          for name, file_name, def_name, old, new in M4D2_NEGATIVES]
+CASES += ARITHMETIC_CASES + ARITHMETIC_WRONG_CASES + [
+    ("coprime-boundary-examples", BASE + COPRIME_EXAMPLES, None),
+    ("rat-field-proof-shapes", BASE + RAT_FIELD_SHAPES, None),
+]
+CASES += [(f"opaque-{name}", mutate_header("RatOps", name,
+           f"reducible def {name}", f"def {name}"), "mismatch")
+          for name, _failing in OPERATION_OPACITY]
+CASES += [
+    ("wrong-rat-inverse-zero-computed", ARITHMETIC_BASE + rat_operation_claim(
+        "wrongRatInverseZero", "(ratInv ratZero)", "ratNum", 1), "mismatch"),
+    ("wrong-rat-division-zero-computed", ARITHMETIC_BASE + rat_operation_claim(
+        "wrongRatDivisionZero", "(ratDiv ratOne ratZero)", "ratNum", 1), "mismatch"),
+    ("nonerased-rat-inverse-hypothesis", mutate_header("RatField", "ratMulInvCancel",
+        "(0 ha :", "(ha :") + RAT_FIELD_SHAPES, "mismatch"),
+    ("nonerased-rat-inverse-equality", mutate_header("RatField", "ratMulInvCancel",
+        "(0 e :", "(e :") + RAT_FIELD_SHAPES, "mismatch"),
+]
+
 # The def that must fail first, for every case that M3a adds. The name
 # comes from the position of the diagnostic, so a mutation that moves the
 # rejection to another def is a failure of the case.
@@ -1275,6 +1523,14 @@ FAILING_DEFS = {
     "opaque-div-computation": "natDivExact",
     "opaque-rat-normalization": "ratNormalizeNum",
     "invalid-rat-zero-reduced-certificate": "invalidRatZeroReduced",
+    **{name: def_name
+       for name, _file, def_name, _old, _new in M4D2_NEGATIVES},
+    **ARITHMETIC_FAILING_DEFS,
+    **{f"opaque-{name}": failing for name, failing in OPERATION_OPACITY},
+    "wrong-rat-inverse-zero-computed": "wrongRatInverseZero",
+    "wrong-rat-division-zero-computed": "wrongRatDivisionZero",
+    "nonerased-rat-inverse-hypothesis": "ratMulInvCancelShape",
+    "nonerased-rat-inverse-equality": "ratMulInvCancel",
 }
 
 def failing_def(source, result):
